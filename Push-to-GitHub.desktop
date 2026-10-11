@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Push JCoin to GitHub
+Comment=Push the local main branch to the configured GitHub repository
+Exec=/home/cody/Desktop/work/jcoin/push-main.sh
+Path=/home/cody/Desktop/work/jcoin
+Terminal=true
+Categories=Development;Network;
