@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=JCoin Wallet
+Comment=Native desktop wallet for the local JCoin prototype
+Exec=/home/cody/Desktop/work/jcoin/run-wallet.sh
+Path=/home/cody/Desktop/work/jcoin
+Terminal=false
+Categories=Finance;Utility;
