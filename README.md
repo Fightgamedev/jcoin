@@ -27,6 +27,7 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - `run-jcoin.sh`, `run-wallet.sh`: launch scripts.
 - `docs/`: client instructions, project notes, and [the CodeQ design](docs/CODEQ.md).
 - [Initial privacy threat model](docs/PRIVACY-THREAT-MODEL.md): current data exposure, assumptions, goals, and open decisions.
+- [Network participation rewards](docs/NETWORK-INCENTIVES.md): a proposed path for rewarding people who run JCoin nodes; no public network or node rewards exist today.
 - `AGENTS.md` and `.github/agents/`: shared coding-agent rules and specialist roles. Start with the [beginner's guide to agents](docs/AGENTS-GUIDE.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
 
@@ -50,9 +51,10 @@ The goal is to grow JCoin from a local wallet prototype toward privacy-first eve
 - [ ] **Milestone 3 — Wallet safety and selective disclosure:** Design spend and viewing keys, encrypted backup and restore across clients, recipient verification, and payment proofs that reveal only selected details.
 - [ ] **Milestone 4 — Everyday private payments:** Improve mobile send and receive; add private receive QR codes or payment requests, clear pending and confirmed states, and useful private receipts.
 - [ ] **Milestone 5 — Private merchant test flow:** In a test environment, explore QR checkout, merchant confirmation, refunds, and basic records without publishing user purchase histories or connecting real funds.
-- [ ] **Milestone 6 — Production readiness review:** Before remote or real-money use, complete independent security and privacy reviews, operational recovery planning, and qualified legal and regulatory review for intended markets. This is a review gate, not a launch commitment.
+- [ ] **Milestone 6 — Distributed network and participation rewards:** Design and test peer discovery, independent validation, reliable node operation, and a capped reward policy. Reward useful, independently verifiable service; do not pay for a node's own uptime report. See [docs/NETWORK-INCENTIVES.md](docs/NETWORK-INCENTIVES.md). This work depends on protocol, privacy, and Sybil-resistance reviews.
+- [ ] **Milestone 7 — Production readiness review:** Before remote or real-money use, complete independent security and privacy reviews, operational recovery planning, and qualified legal and regulatory review for intended markets. This is a review gate, not a launch commitment.
 
-Top-ups, cash-outs, rewards, and a public network are out of scope until earlier milestones are complete and separately reviewed.
+Top-ups, cash-outs, merchant payments, network participation rewards, and a public network are future goals only. They are not supported until the prerequisite design, implementation, and independent reviews are complete.
 
 ### CodeQ experiment
 
@@ -62,4 +64,4 @@ CodeQ (Conserved-Quanta Payment Code) is a proposed declarative language for exp
 
 This is a small, centrally operated blockchain prototype. Blocks are linked by SHA-256 hashes and signed by the one validator key on your laptop. User transfers use Ed25519 signatures. The issuance defaults are Litecoin-like (50 JCOIN per block, halving every 840,000 blocks, 84,000,000 cap); they are prototype settings, not a launch specification.
 
-This is not Bitcoin or Litecoin consensus and is not decentralized: users trust your validator, and one machine controls block production. The current version listens only on your own laptop. Transaction details are visible in its ledger and it has not been reviewed for security or privacy. JCOIN has no real-world value. Do not expose the node to the internet or use real funds.
+This is not Bitcoin or Litecoin consensus and is not decentralized: users trust your validator, and one machine controls block production. The current version listens only on your own laptop. Its prototype block reward goes to the local validator wallet; it does not reward other computers or measure uptime. Transaction details are visible in its ledger and it has not been reviewed for security or privacy. JCOIN has no real-world value. Do not expose the node to the internet or use real funds.
