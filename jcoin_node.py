@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "node-data"
 DB_PATH = DATA / "jcoin.sqlite3"
 KEY_PATH = DATA / "master-validator.key"
-INDEX = ROOT / "index.html"
+LANDING = ROOT / "index.html"
+DASHBOARD = ROOT / "dashboard.html"
 HOST, PORT = "127.0.0.1", 8765
 COIN_CAP = 84_000_000
 INITIAL_REWARD = 50
@@ -269,8 +270,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path in ("/", "/JCoin-Wallet.html"):
-            page = INDEX if parsed.path == "/" else ROOT / "JCoin-Wallet.html"
+        pages = {
+            "/": LANDING,
+            "/index.html": LANDING,
+            "/dashboard": DASHBOARD,
+            "/dashboard.html": DASHBOARD,
+            "/JCoin-Wallet.html": ROOT / "JCoin-Wallet.html",
+        }
+        if parsed.path in pages:
+            page = pages[parsed.path]
             data = page.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -354,14 +362,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if not INDEX.exists():
-        raise SystemExit("index.html is missing beside jcoin_node.py")
+    missing_pages = [str(page.name) for page in (LANDING, DASHBOARD) if not page.exists()]
+    if missing_pages:
+        raise SystemExit("Required web page(s) missing beside jcoin_node.py: " + ", ".join(missing_pages))
     initialize_chain()
     verify_chain()
     print("JCoin node and validator started.")
     print("Master wallet: " + MASTER_ADDR)
     print("Master key: " + str(KEY_PATH) + " (keep it private and back it up)")
-    print("Dashboard: http://127.0.0.1:%d" % PORT)
+    print("Jcoin home: http://127.0.0.1:%d" % PORT)
+    print("Local dashboard: http://127.0.0.1:%d/dashboard" % PORT)
     print("Local-only mode: other computers cannot connect in this prototype.")
     threading.Timer(1.0, lambda: webbrowser.open("http://127.0.0.1:%d" % PORT)).start()
     try:

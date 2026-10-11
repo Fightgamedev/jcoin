@@ -4,7 +4,7 @@ JCoin now runs as a centrally operated, single-validator test prototype. Your la
 
 ## Start the node
 
-Double-click JCoin.desktop. If Linux Mint asks whether to trust or launch the file, choose Allow Launching. A terminal runs the node and the dashboard opens at http://127.0.0.1:8765. Keep that terminal open while using JCoin; close it to stop the node.
+Double-click JCoin.desktop. If Linux Mint asks whether to trust or launch the file, choose Allow Launching. A terminal runs the node and the Jcoin home page opens at http://127.0.0.1:8765. Choose **Open local wallet** to enter the dashboard at http://127.0.0.1:8765/dashboard. Keep the terminal open while using Jcoin; close it to stop the node.
 
 You can also run ./run-jcoin.sh from this folder. The first start creates node-data/jcoin.sqlite3 and node-data/master-validator.key. The master key is the validator identity and controls the master wallet. Keep the key private and make a secure backup.
 
@@ -19,7 +19,8 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 ## Project layout
 
 - `jcoin_node.py`: loopback node, transaction validation, and block signing.
-- `index.html`: node dashboard and browser wallet.
+- `index.html`: bilingual Jcoin landing page and staged product roadmap.
+- `dashboard.html`: local node dashboard and browser wallet.
 - `JCoin-Wallet.html`: standalone encrypted-backup browser wallet.
 - `jcoin_wallet.py`: native GTK wallet.
 - `run-jcoin.sh`, `run-wallet.sh`: launch scripts.

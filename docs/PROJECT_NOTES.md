@@ -3,7 +3,8 @@
 ## Current shape
 
 - `jcoin_node.py` runs a loopback-only HTTP node and validator.
-- `index.html` is the dashboard and browser wallet hosted by the node.
+- `index.html` is the bilingual project landing page hosted by the node.
+- `dashboard.html` is the local dashboard and browser wallet.
 - `JCoin-Wallet.html` is a standalone browser wallet for a compatible node.
 - `jcoin_wallet.py` is the GTK4 native wallet.
 - `run-jcoin.sh` and `run-wallet.sh` are the shell launchers.
@@ -27,6 +28,7 @@
 ## Known limitations
 
 - The chain has one trusted validator and no peer-to-peer networking or consensus.
+- QR payments, merchant checkout, top-ups, rewards, and split bills are roadmap ideas only; none are implemented.
 - The node's storage and API have not had a security audit.
 - The native client requires GTK4 and PyGObject from the operating system in addition to Python packages.
 - No automated test suite is currently included.

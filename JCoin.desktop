@@ -2,7 +2,7 @@
 Version=1.0
 Type=Application
 Name=JCoin Node
-Comment=Run your local JCoin validator and open its dashboard
+Comment=Run your local JCoin validator and open its home page
 Exec=/home/cody/Desktop/work/jcoin/run-jcoin.sh
 Icon=network-server
 Terminal=true
