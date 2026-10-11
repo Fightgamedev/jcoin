@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Native GTK4 wallet for the local JCoin prototype."""
-import base64, hashlib, json, os, time, urllib.error, urllib.parse, urllib.request
+import base64, hashlib, json, os, secrets, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 import gi
 gi.require_version('Gtk', '4.0')
@@ -61,8 +61,13 @@ class Wallet(Gtk.Application):
         if len(password)<8: self.note('Use a password with at least 8 characters.'); return
         DATA.mkdir(parents=True,exist_ok=True); salt=os.urandom(16); nonce=os.urandom(12); key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32)
         private=Ed25519PrivateKey.generate().private_bytes_raw(); encrypted=AESGCM(key).encrypt(nonce,private,None)
-        path=DATA/('wallet-'+time.strftime('%Y%m%d-%H%M%S')+'.jcoinwallet')
-        path.write_text(json.dumps({'version':1,'salt':base64.b64encode(salt).decode(),'nonce':base64.b64encode(nonce).decode(),'key':base64.b64encode(encrypted).decode()})); path.chmod(0o600)
+        payload=json.dumps({'version':1,'salt':base64.b64encode(salt).decode(),'nonce':base64.b64encode(nonce).decode(),'key':base64.b64encode(encrypted).decode()})
+        path=DATA/('wallet-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(4)+'.jcoinwallet')
+        fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+        with os.fdopen(fd,'w') as wallet_file:
+            wallet_file.write(payload)
+            wallet_file.flush()
+            os.fsync(wallet_file.fileno())
         self.unlock(private,path)
     def open_wallet(self):
         chooser=Gtk.FileChooserNative(title='Open JCoin wallet', transient_for=self.window, action=Gtk.FileChooserAction.OPEN,accept_label='Open',cancel_label='Cancel')
