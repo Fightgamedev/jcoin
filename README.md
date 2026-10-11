@@ -26,9 +26,17 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - `jcoin_codeq.py`: CodeQ's transparent deterministic allocation spike; it does not submit payments or hide transaction details.
 - `run-jcoin.sh`, `run-wallet.sh`: launch scripts.
 - `docs/`: client instructions, project notes, and [the CodeQ design](docs/CODEQ.md).
+- `AGENTS.md` and `.github/agents/`: shared coding-agent rules and specialist roles. Start with the [beginner's guide to agents](docs/AGENTS-GUIDE.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
 
 Rebuild the standalone wallet bundle with `./build-client.sh` after changing its page or guide.
+
+## Working with AI agents
+
+The repository includes reusable roles for coordinating project work, privacy
+design, implementation, and security review. They are helpers—not automatic
+proof of correctness or security. Read the [beginner's guide](docs/AGENTS-GUIDE.md)
+before trying a multi-agent task; all agents must follow [AGENTS.md](AGENTS.md).
 
 ## Milestones
 
