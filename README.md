@@ -26,6 +26,7 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - `jcoin_codeq.py`: CodeQ's transparent deterministic allocation spike; it does not submit payments or hide transaction details.
 - `run-jcoin.sh`, `run-wallet.sh`: launch scripts.
 - `docs/`: client instructions, project notes, and [the CodeQ design](docs/CODEQ.md).
+- [Initial privacy threat model](docs/PRIVACY-THREAT-MODEL.md): current data exposure, assumptions, goals, and open decisions.
 - `AGENTS.md` and `.github/agents/`: shared coding-agent rules and specialist roles. Start with the [beginner's guide to agents](docs/AGENTS-GUIDE.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
 
@@ -43,7 +44,7 @@ before trying a multi-agent task; all agents must follow [AGENTS.md](AGENTS.md).
 The goal is to grow JCoin from a local wallet prototype toward privacy-first everyday payments. Milestones are sequenced by dependency; future features are ideas, not delivery promises. JCoin remains test-only until the final review is complete.
 
 - [x] **Milestone 0 — Local prototype:** Run one local validator, create wallets, sign and queue transfers, confirm them in blocks, and inspect balances and activity.
-- [ ] **Milestone 1 — Privacy threat model:** Define what the public, validator, recipient, wallet provider, and network observer can learn. Select a proven privacy model and make shielded transactions the default; document metadata and recovery trade-offs.
+- [ ] **Milestone 1 — Privacy threat model:** Define what the public, validator, recipient, wallet provider, and network observer can learn. The initial, code-grounded draft is in [docs/PRIVACY-THREAT-MODEL.md](docs/PRIVACY-THREAT-MODEL.md); model selection, privacy defaults, and protocol design remain open.
 - [x] **Milestone 1a — CodeQ allocation spike:** Define a declarative payment intent and deterministic integer allocation rule that conserves the full amount across recipients. The current compiler prints cleartext data; its hash is not hiding, and it is not connected to the wallet.
 - [ ] **Milestone 2 — Shielded protocol and correctness:** Prototype private notes, hidden values and recipients, double-spend prevention, and a proof that inputs equal outputs plus fees while satisfying CodeQ rules. Use established cryptography, add automated coverage, validate stored history at startup, and make database writes atomic under concurrent requests.
 - [ ] **Milestone 3 — Wallet safety and selective disclosure:** Design spend and viewing keys, encrypted backup and restore across clients, recipient verification, and payment proofs that reveal only selected details.

@@ -17,6 +17,9 @@
 - Transactions are canonical JSON signed with Ed25519.
 - The node is a centrally operated, single-validator prototype, not decentralized consensus.
 - Current transactions expose sender, recipient, and amount in cleartext. No private-payment cryptography is implemented.
+- The initial privacy threat-model draft is in `docs/PRIVACY-THREAT-MODEL.md`. It records unresolved decisions and must be updated when data flows change.
+- Node request logs omit query strings to avoid copying balance-query addresses into terminal logs. The address is still sent in the local HTTP request.
+- `/api/pending` returns full cleartext transactions only after the loopback/Origin check, which is not general authentication. Wildcard CORS remains a limitation to resolve before any remote or sensitive use.
 - The node binds to `127.0.0.1:8765`; remote access is not supported or safe to enable without a separate security review.
 
 ## Before continuing development

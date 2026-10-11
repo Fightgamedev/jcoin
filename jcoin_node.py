@@ -231,7 +231,15 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "JCoinNode/0.1"
 
     def log_message(self, fmt, *args):
-        print("%s - %s" % (self.address_string(), fmt % args), flush=True)
+        safe_args = args
+        if args and isinstance(args[0], str):
+            request_parts = args[0].split()
+            if len(request_parts) >= 2:
+                # Query strings can contain wallet addresses; keep them out of
+                # terminal output and scrollback.
+                request_parts[1] = urlparse(request_parts[1]).path or "/"
+                safe_args = (" ".join(request_parts),) + args[1:]
+        print("%s - %s" % (self.address_string(), fmt % safe_args), flush=True)
 
     def local_operator(self):
         origin = self.headers.get("Origin")
@@ -304,6 +312,9 @@ class Handler(BaseHTTPRequestHandler):
                     "reward": block["reward"], "transactions": len(block["transactions"])})
             self.send_json(200, result)
         elif parsed.path == "/api/pending":
+            if not self.local_operator():
+                self.send_json(403, {"error": "Pending transaction details are local-only."})
+                return
             rows = DB.execute("SELECT body FROM pending ORDER BY rowid").fetchall()
             self.send_json(200, [json.loads(r["body"]) for r in rows])
         else:
