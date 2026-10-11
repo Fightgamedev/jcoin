@@ -29,6 +29,19 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 
 Rebuild the standalone wallet bundle with `./build-client.sh` after changing its page or guide.
 
+## Milestones
+
+The goal is to grow JCoin from a local wallet prototype toward a simple everyday payment experience. Milestones are sequenced by dependency; future features are ideas, not delivery promises. JCoin remains test-only until the final review is complete.
+
+- [x] **Milestone 0 — Local prototype:** Run one local validator, create wallets, sign and queue transfers, confirm them in blocks, and inspect balances and activity.
+- [ ] **Milestone 1 — Wallet safety and recovery:** Define one wallet format for the browser and native clients; add encrypted export, import, and restore; verify a restored wallet address before use; document backup and recovery steps.
+- [ ] **Milestone 2 — Protocol correctness:** Add automated coverage for transaction signatures, nonces, duplicate submissions, overspending, block rewards, and the supply cap. Validate all stored blocks and transactions at startup, and make database writes atomic under concurrent requests.
+- [ ] **Milestone 3 — Everyday person-to-person payments:** Improve the mobile send and receive flow; add receive QR codes or payment links, clear pending and confirmed states, and useful transaction receipts. Keep QR data bound to the intended recipient and amount where applicable.
+- [ ] **Milestone 4 — Merchant test flow:** In a test environment, explore merchant-presented QR checkout, payment confirmation, refunds, and basic merchant records. Do not connect real funds.
+- [ ] **Milestone 5 — Production readiness review:** Before any remote or real-money use, complete independent security and privacy reviews, operational recovery planning, and qualified legal and regulatory review for the intended markets. This milestone is a review gate, not a launch commitment.
+
+Top-ups, cash-outs, rewards, and a public network are out of scope until earlier milestones are complete and separately reviewed.
+
 ## What this is
 
 This is a small, centrally operated blockchain prototype. Blocks are linked by SHA-256 hashes and signed by the one validator key on your laptop. User transfers use Ed25519 signatures. The issuance defaults are Litecoin-like (50 JCOIN per block, halving every 840,000 blocks, 84,000,000 cap); they are prototype settings, not a launch specification.
