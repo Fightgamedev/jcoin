@@ -5,6 +5,7 @@
 - `jcoin_node.py` runs a loopback-only HTTP node and validator.
 - `index.html` is the bilingual project landing page hosted by the node.
 - `dashboard.html` is the local dashboard and browser wallet.
+- `jcoin_codeq.py` is an isolated CodeQ allocation prototype, not wired into transfers.
 - `JCoin-Wallet.html` is a standalone browser wallet for a compatible node.
 - `jcoin_wallet.py` is the GTK4 native wallet.
 - `run-jcoin.sh` and `run-wallet.sh` are the shell launchers.
@@ -29,6 +30,7 @@
 
 - The chain has one trusted validator and no peer-to-peer networking or consensus.
 - QR payments, merchant checkout, top-ups, rewards, and split bills are roadmap ideas only; none are implemented.
+- CodeQ uses deterministic integer apportionment for multi-recipient allocation; it is not yet signed, replay-protected, or settled by the node.
 - The node's storage and API have not had a security audit.
 - The native client requires GTK4 and PyGObject from the operating system in addition to Python packages.
 - No automated test suite is currently included.

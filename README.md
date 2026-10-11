@@ -23,8 +23,9 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - `dashboard.html`: local node dashboard and browser wallet.
 - `JCoin-Wallet.html`: standalone encrypted-backup browser wallet.
 - `jcoin_wallet.py`: native GTK wallet.
+- `jcoin_codeq.py`: CodeQ's deterministic, multi-recipient allocation prototype; it does not submit payments.
 - `run-jcoin.sh`, `run-wallet.sh`: launch scripts.
-- `docs/`: client instructions and project continuation notes.
+- `docs/`: client instructions, project notes, and [the CodeQ design](docs/CODEQ.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
 
 Rebuild the standalone wallet bundle with `./build-client.sh` after changing its page or guide.
@@ -36,11 +37,16 @@ The goal is to grow JCoin from a local wallet prototype toward a simple everyday
 - [x] **Milestone 0 — Local prototype:** Run one local validator, create wallets, sign and queue transfers, confirm them in blocks, and inspect balances and activity.
 - [ ] **Milestone 1 — Wallet safety and recovery:** Define one wallet format for the browser and native clients; add encrypted export, import, and restore; verify a restored wallet address before use; document backup and recovery steps.
 - [ ] **Milestone 2 — Protocol correctness:** Add automated coverage for transaction signatures, nonces, duplicate submissions, overspending, block rewards, and the supply cap. Validate all stored blocks and transactions at startup, and make database writes atomic under concurrent requests.
+- [x] **Milestone 2a — CodeQ math spike:** Define a declarative payment intent and deterministic integer allocation rule that conserves the full amount across recipients. This is a standalone experiment, not yet connected to wallet transactions.
 - [ ] **Milestone 3 — Everyday person-to-person payments:** Improve the mobile send and receive flow; add receive QR codes or payment links, clear pending and confirmed states, and useful transaction receipts. Keep QR data bound to the intended recipient and amount where applicable.
 - [ ] **Milestone 4 — Merchant test flow:** In a test environment, explore merchant-presented QR checkout, payment confirmation, refunds, and basic merchant records. Do not connect real funds.
 - [ ] **Milestone 5 — Production readiness review:** Before any remote or real-money use, complete independent security and privacy reviews, operational recovery planning, and qualified legal and regulatory review for the intended markets. This milestone is a review gate, not a launch commitment.
 
 Top-ups, cash-outs, rewards, and a public network are out of scope until earlier milestones are complete and separately reviewed.
+
+### CodeQ experiment
+
+CodeQ (Conserved-Quanta Payment Code) is an early Jcoin experiment for describing one payment split across multiple destinations. Its integer allocation rule guarantees that output amounts add up exactly to the input amount. The compiler and limitations are documented in [docs/CODEQ.md](docs/CODEQ.md). The name is not globally unique, and the underlying arithmetic is not claimed as new mathematics.
 
 ## What this is
 
