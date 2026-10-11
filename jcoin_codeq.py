@@ -2,7 +2,8 @@
 """Jcoin CodeQ: deterministic, conservation-preserving payment intent compiler.
 
 CodeQ is a declarative prototype. It never executes user-provided code and does
-not submit or sign transactions.
+not submit or sign transactions. Its result reveals the full intent and is not
+privacy-preserving; the SHA-256 intent hash is not an encryption mechanism.
 """
 import hashlib
 import json
@@ -11,7 +12,7 @@ import time
 from typing import Any
 
 
-VERSION = "jcoin-codeq/0.1"
+VERSION = "jcoin-codeq/0.2"
 BASIS_POINTS = 10_000
 MAX_LANES = 16
 ADDRESS_RE = re.compile(r"^JC[0-9a-f]{40}$")
@@ -116,7 +117,7 @@ def compile_codeq(intent: dict[str, Any], now: int | None = None) -> dict[str, A
             "input": amount,
             "allocated": sum(item["amount"] for item in allocations),
         },
-        "commitment": hashlib.sha256(canonical(committed).encode("ascii")).hexdigest(),
+        "intent_hash": hashlib.sha256(canonical(committed).encode("ascii")).hexdigest(),
     }
 
 

@@ -16,6 +16,7 @@
 - Addresses are `JC` followed by the first 40 lowercase hexadecimal characters of SHA-256(public key).
 - Transactions are canonical JSON signed with Ed25519.
 - The node is a centrally operated, single-validator prototype, not decentralized consensus.
+- Current transactions expose sender, recipient, and amount in cleartext. No private-payment cryptography is implemented.
 - The node binds to `127.0.0.1:8765`; remote access is not supported or safe to enable without a separate security review.
 
 ## Before continuing development
@@ -30,7 +31,7 @@
 
 - The chain has one trusted validator and no peer-to-peer networking or consensus.
 - QR payments, merchant checkout, top-ups, rewards, and split bills are roadmap ideas only; none are implemented.
-- CodeQ uses deterministic integer apportionment for multi-recipient allocation; it is not yet signed, replay-protected, or settled by the node.
+- CodeQ uses deterministic integer apportionment for multi-recipient allocation; it is not yet signed, replay-protected, privacy-preserving, or settled by the node. Its SHA-256 hash is not encryption.
 - The node's storage and API have not had a security audit.
 - The native client requires GTK4 and PyGObject from the operating system in addition to Python packages.
 - No automated test suite is currently included.

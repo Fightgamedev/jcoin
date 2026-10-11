@@ -12,4 +12,4 @@ separate secure backup and remember the password; the node cannot recover it.
 Python dependencies are listed in `requirements.txt`. GTK4 and PyGObject must
 also be installed through the operating system's package manager.
 
-This is an experimental single-validator prototype. Use test coins only.
+This is an experimental single-validator prototype. The ledger exposes sender addresses, recipient addresses, and amounts; encrypted key storage does not make transactions private. Use test coins only.
