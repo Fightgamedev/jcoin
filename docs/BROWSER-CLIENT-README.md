@@ -4,7 +4,7 @@
 private key in an encrypted `.jcoinwallet` backup and signs transfers in the
 browser. The local dashboard also supports encrypted backup and restore for
 new browser wallets; its backup files use the same format as the standalone
-wallet. The current node records sender addresses, recipient addresses, and
+and native wallets. The current node records sender addresses, recipient addresses, and
 amounts in cleartext; encrypted key storage does not make transactions
 private. Users need the validator operator's node URL to connect.
 

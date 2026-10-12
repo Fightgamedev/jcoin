@@ -5,7 +5,7 @@
 - `jcoin_node.py` runs a loopback-only HTTP node and validator.
 - `index.html` is the bilingual project landing page hosted by the node.
 - `dashboard.html` is the local dashboard and browser wallet.
-- New dashboard browser wallets export and restore password-encrypted `.jcoinwallet` backups compatible with the standalone browser wallet. Older dashboard wallets without a saved backup use non-extractable keys and cannot be exported by the dashboard.
+- New dashboard, standalone browser, and native wallets share a password-encrypted `.jcoinwallet` format. The native client still reads its legacy format and writes a compatible copy; older dashboard wallets without a saved backup use non-extractable keys and cannot be exported by the dashboard.
 - `jcoin_codeq.py` is an isolated CodeQ allocation prototype, not wired into transfers.
 - `JCoin-Wallet.html` is a standalone browser wallet for a compatible node.
 - `jcoin_wallet.py` is the GTK4 native wallet.

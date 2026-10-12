@@ -6,7 +6,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat, load_der_private_key
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 APP = 'JCoin Wallet'
@@ -54,25 +54,38 @@ class Wallet(Gtk.Application):
         except Exception: return 'http://127.0.0.1:8765'
     def save_url(self):
         CONFIG.parent.mkdir(parents=True,exist_ok=True); CONFIG.write_text(json.dumps({'node':self.endpoint.get_text().rstrip('/')})); CONFIG.chmod(0o600)
-    def prompt(self,title,callback):
+    def prompt(self,title,callback,confirm_password=False):
         d=Gtk.Dialog(title=title,transient_for=self.window,modal=True); d.add_button('Cancel',Gtk.ResponseType.CANCEL); d.add_button('Continue',Gtk.ResponseType.OK)
         box=d.get_content_area(); box.set_spacing(10); box.set_margin_top(14); box.set_margin_bottom(14); box.set_margin_start(14); box.set_margin_end(14)
-        e=Gtk.PasswordEntry(); e.set_show_peek_icon(True); e.set_placeholder_text('Wallet password'); box.append(e)
-        d.connect('response',lambda dlg,res:(callback(e.get_text()) if res==Gtk.ResponseType.OK else None,dlg.destroy())); d.present()
+        e=Gtk.PasswordEntry(); e.set_show_peek_icon(True); e.set_placeholder_text('Wallet password (12+ characters)' if confirm_password else 'Wallet password'); box.append(e)
+        second=None
+        if confirm_password:
+            second=Gtk.PasswordEntry(); second.set_show_peek_icon(True); second.set_placeholder_text('Confirm wallet password'); box.append(second)
+        def on_response(dlg,res):
+            if res==Gtk.ResponseType.OK:
+                if confirm_password and e.get_text()!=second.get_text():
+                    self.note('The passwords do not match. Please try creating the wallet again.'); dlg.destroy(); return
+                callback(e.get_text())
+            dlg.destroy()
+        d.connect('response',on_response); d.present()
     def create_wallet(self):
-        self.prompt('Create encrypted wallet',lambda password:self._create(password))
+        self.prompt('Create encrypted wallet',lambda password:self._create(password),confirm_password=True)
     def _create(self,password):
-        if len(password)<8: self.note('Use a password with at least 8 characters.'); return
-        DATA.mkdir(parents=True,exist_ok=True); salt=os.urandom(16); nonce=os.urandom(12); key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32)
-        private=Ed25519PrivateKey.generate().private_bytes_raw(); encrypted=AESGCM(key).encrypt(nonce,private,None)
-        payload=json.dumps({'version':1,'salt':base64.b64encode(salt).decode(),'nonce':base64.b64encode(nonce).decode(),'key':base64.b64encode(encrypted).decode()})
+        if len(password)<12: self.note('Use a wallet password with at least 12 characters.'); return
+        private=Ed25519PrivateKey.generate()
         path=DATA/('wallet-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(4)+'.jcoinwallet')
+        self.write_compatible_backup(private,password,path,'JCoin wallet')
+        self.unlock(private,path,'Wallet created. This encrypted backup works with the browser wallets too.')
+    def write_compatible_backup(self,private,password,path,name):
+        DATA.mkdir(mode=0o700,parents=True,exist_ok=True)
+        salt=os.urandom(16); iv=os.urandom(12); key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32)
+        private_der=private.private_bytes(Encoding.DER,PrivateFormat.PKCS8,NoEncryption())
+        encrypted=AESGCM(key).encrypt(iv,private_der,None)
+        public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
+        payload={'format':'jcoin-wallet','version':1,'name':name,'address':address(public),'publicKey':base64.b64encode(public).decode(),'kdf':'PBKDF2-SHA256-310000','cipher':'AES-256-GCM','salt':base64.b64encode(salt).decode(),'iv':base64.b64encode(iv).decode(),'encryptedPrivateKey':base64.b64encode(encrypted).decode()}
         fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(fd,'w') as wallet_file:
-            wallet_file.write(payload)
-            wallet_file.flush()
-            os.fsync(wallet_file.fileno())
-        self.unlock(private,path)
+            json.dump(payload,wallet_file,indent=2); wallet_file.write('\n'); wallet_file.flush(); os.fsync(wallet_file.fileno())
     def open_wallet(self):
         chooser=Gtk.FileChooserNative(title='Open JCoin wallet', transient_for=self.window, action=Gtk.FileChooserAction.OPEN,accept_label='Open',cancel_label='Cancel')
         f=Gtk.FileFilter(); f.set_name('JCoin wallet'); f.add_pattern('*.jcoinwallet'); chooser.add_filter(f)
@@ -82,9 +95,29 @@ class Wallet(Gtk.Application):
         self.prompt('Unlock wallet',lambda password:self._unlock(p,password))
     def _unlock(self,p,password):
         try:
-            d=json.loads(p.read_text()); salt=base64.b64decode(d['salt']); nonce=base64.b64decode(d['nonce']); key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32); raw=AESGCM(key).decrypt(nonce,base64.b64decode(d['key']),None); self.unlock(raw,p)
-        except Exception: self.note('Could not unlock wallet. Check the password and file.')
-    def unlock(self,raw,p): self.key=Ed25519PrivateKey.from_private_bytes(raw); self.file=p; self.addr.set_text(address(self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw))); self.note('Wallet unlocked in memory for this session.'); self.refresh()
+            d=json.loads(p.read_text())
+            if d.get('format')=='jcoin-wallet':
+                if d.get('version')!=1 or d.get('kdf')!='PBKDF2-SHA256-310000' or d.get('cipher')!='AES-256-GCM': raise ValueError('Unsupported backup format.')
+                salt=base64.b64decode(d['salt'],validate=True); iv=base64.b64decode(d['iv'],validate=True); encrypted=base64.b64decode(d['encryptedPrivateKey'],validate=True)
+                key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32); raw=AESGCM(key).decrypt(iv,encrypted,None)
+                private=load_der_private_key(raw,password=None)
+                if not isinstance(private,Ed25519PrivateKey): raise ValueError('Wallet key type is invalid.')
+                public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
+                if address(public)!=d.get('address') or base64.b64encode(public).decode()!=d.get('publicKey'): raise ValueError('Wallet key does not match its address.')
+                self.unlock(private,p,'Wallet unlocked. This backup is compatible with the browser wallets.')
+            else:
+                # Read the original native wallet format and preserve it while writing a compatible copy.
+                salt=base64.b64decode(d['salt'],validate=True); nonce=base64.b64decode(d['nonce'],validate=True); encrypted=base64.b64decode(d['key'],validate=True)
+                key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32); raw=AESGCM(key).decrypt(nonce,encrypted,None)
+                private=Ed25519PrivateKey.from_private_bytes(raw)
+                public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
+                name='JCoin wallet'
+                target=DATA/('wallet-compatible-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(4)+'.jcoinwallet')
+                self.write_compatible_backup(private,password,target,name)
+                self.unlock(private,p,'Legacy wallet opened. A browser-compatible encrypted copy was saved as '+target.name+'.')
+        except Exception as e: self.note('Could not unlock wallet. Check the password and file. '+str(e))
+    def unlock(self,private,p,message='Wallet unlocked in memory for this session.'):
+        self.key=private; self.file=p; self.addr.set_text(address(self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw))); self.note(message); self.refresh()
     def note(self,msg): self.message.set_text(msg)
     def refresh(self,*_):
         try:
