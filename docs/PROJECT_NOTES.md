@@ -18,6 +18,7 @@
 - The node is a centrally operated, single-validator prototype, not decentralized consensus.
 - Current transactions expose sender, recipient, and amount in cleartext. No private-payment cryptography is implemented.
 - The initial privacy threat-model draft is in `docs/PRIVACY-THREAT-MODEL.md`. It records unresolved decisions and must be updated when data flows change.
+- `docs/PRIVACY-PROTOCOL-EVALUATION.md` is an early model comparison and decision checklist, not a selection or endorsement. Do not implement a new privacy protocol from it.
 - A future goal is to let people run nodes on their computers and earn rewards for verifiable network service. The design sketch and current limitations are in `docs/NETWORK-INCENTIVES.md`.
 - Node request logs omit query strings to avoid copying balance-query addresses into terminal logs. The address is still sent in the local HTTP request.
 - `/api/pending` returns full cleartext transactions only after the loopback/Origin check, which is not general authentication. Wildcard CORS remains a limitation to resolve before any remote or sensitive use.

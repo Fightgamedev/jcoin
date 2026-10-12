@@ -175,6 +175,8 @@ implementation:
 
 1. Which established privacy protocol and maintained implementation should be
    evaluated, and what threat model and trust assumptions does it provide?
+   See the early [privacy protocol evaluation](PRIVACY-PROTOCOL-EVALUATION.md);
+   it compares design shapes but selects no protocol.
 2. Is privacy mandatory for every payment, including fees, issuance, and
    merchant receipts? What, if anything, may be transparent by explicit user
    choice?
