@@ -8,6 +8,7 @@
 - New dashboard, standalone browser, and native wallets share a password-encrypted `.jcoinwallet` format. The native client still reads its legacy format and writes a compatible copy; older dashboard wallets without a saved backup use non-extractable keys and cannot be exported by the dashboard.
 - `jcoin_codeq.py` is an isolated CodeQ allocation prototype, not wired into transfers.
 - `jcoin_backup.py` defines the shared password-encrypted wallet backup format; `tests/` checks it against native cryptography and browser-style WebCrypto.
+- `docs/FIRST-RELEASE.md` records the provisional Japan-first test audience and local desktop scope; it is a product learning target, not a public launch promise.
 - `JCoin-Wallet.html` is a standalone browser wallet for a compatible node.
 - `jcoin_wallet.py` is the GTK4 native wallet.
 - `run-jcoin.sh` and `run-wallet.sh` are the shell launchers.

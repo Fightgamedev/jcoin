@@ -31,6 +31,7 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - [Initial privacy threat model](docs/PRIVACY-THREAT-MODEL.md): current data exposure, assumptions, goals, and open decisions.
 - [Privacy protocol evaluation](docs/PRIVACY-PROTOCOL-EVALUATION.md): early Monero and Zcash model comparison and decision criteria; no protocol selected.
 - [Explicit privacy-mode protocol proposal](docs/JCOIN-EXPLICIT-PRIVACY-PROTOCOL.md): private-by-default design with a deliberate transparent option and fail-closed rules; research only.
+- [First release scope](docs/FIRST-RELEASE.md): initial audience, local test release tasks, acceptance goal, and explicit exclusions.
 - [Network participation rewards](docs/NETWORK-INCENTIVES.md): a proposed path for rewarding people who run JCoin nodes; no public network or node rewards exist today.
 - `AGENTS.md` and `.github/agents/`: shared coding-agent rules and specialist roles. Start with the [beginner's guide to agents](docs/AGENTS-GUIDE.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
@@ -76,9 +77,9 @@ The goal is to grow JCoin from a local wallet prototype toward privacy-first eve
 These are the next concrete tasks, ordered by safety and dependency. The first item is complete; the remaining items are open product and architecture work.
 
 - [x] **Verify wallet backup interoperability:** Automated round-trip checks cover the shared browser/native backup format, wrong passwords, damaged metadata, and legacy native-file migration.
-- [ ] **Choose the first audience and platform:** Decide whether the first release is for everyday wallet users in Japan or network contributors, and identify the initial device/OS target. This choice will shape onboarding and the first useful payment flow.
+- [x] **Choose the first audience and platform:** Start with Japanese-speaking, non-technical desktop testers of the local prototype; remote and mobile-only use wait for network and privacy readiness. See [first release scope](docs/FIRST-RELEASE.md).
 - [ ] **Settle the privacy architecture:** Compare maintained protocol implementations and their full wallet/consensus requirements; require expert review before protocol implementation. Do not invent cryptographic primitives.
-- [ ] **Define a small first release:** Scope wallet creation/recovery, receiving, sending, and confirmation for the selected audience. Keep current features local and test-only while privacy is unimplemented.
+- [x] **Define a small first release:** Scope wallet creation/recovery, receiving, explicitly transparent test sending, and honest confirmation states for the selected audience. See [first release scope](docs/FIRST-RELEASE.md).
 - [ ] **Keep node rewards behind network design:** First build peer-to-peer validation and a reviewed way to measure useful service; do not reward self-reported uptime.
 
 Top-ups, cash-outs, merchant payments, network participation rewards, and a public network are future goals only. They are not supported until the prerequisite design, implementation, and independent reviews are complete.
