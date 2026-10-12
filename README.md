@@ -24,6 +24,8 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - `JCoin-Wallet.html`: standalone encrypted-backup browser wallet.
 - `jcoin_wallet.py`: native GTK wallet.
 - `jcoin_codeq.py`: CodeQ's transparent deterministic allocation spike; it does not submit payments or hide transaction details.
+- `jcoin_backup.py`: shared encrypted wallet-backup format and validation used by the native wallet.
+- `tests/`: automated backup-format and Python/WebCrypto interoperability checks.
 - `run-jcoin.sh`, `run-wallet.sh`: launch scripts.
 - `docs/`: client instructions, project notes, and [the CodeQ design](docs/CODEQ.md).
 - [Initial privacy threat model](docs/PRIVACY-THREAT-MODEL.md): current data exposure, assumptions, goals, and open decisions.
@@ -34,6 +36,19 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
 
 Rebuild the standalone wallet bundle with `./build-client.sh` after changing its page or guide.
+
+## Development checks
+
+Run the wallet-backup checks with:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+The Python/native checks use the project requirements. The browser WebCrypto
+interoperability checks also use Node.js; Python skips those two checks when
+Node.js is unavailable. These checks cover backup serialization and recovery,
+not payment privacy or blockchain consensus.
 
 ## Working with AI agents
 
@@ -55,6 +70,16 @@ The goal is to grow JCoin from a local wallet prototype toward privacy-first eve
 - [ ] **Milestone 5 — Private merchant test flow:** In a test environment, explore QR checkout, merchant confirmation, refunds, and basic records without publishing user purchase histories or connecting real funds.
 - [ ] **Milestone 6 — Distributed network and participation rewards:** Design and test peer discovery, independent validation, reliable node operation, and a capped reward policy. Reward useful, independently verifiable service; do not pay for a node's own uptime report. See [docs/NETWORK-INCENTIVES.md](docs/NETWORK-INCENTIVES.md). This work depends on protocol, privacy, and Sybil-resistance reviews.
 - [ ] **Milestone 7 — Production readiness review:** Before remote or real-money use, complete independent security and privacy reviews, operational recovery planning, and qualified legal and regulatory review for intended markets. This is a review gate, not a launch commitment.
+
+## Next work queue
+
+These are the next concrete tasks, ordered by safety and dependency. The first item is complete; the remaining items are open product and architecture work.
+
+- [x] **Verify wallet backup interoperability:** Automated round-trip checks cover the shared browser/native backup format, wrong passwords, damaged metadata, and legacy native-file migration.
+- [ ] **Choose the first audience and platform:** Decide whether the first release is for everyday wallet users in Japan or network contributors, and identify the initial device/OS target. This choice will shape onboarding and the first useful payment flow.
+- [ ] **Settle the privacy architecture:** Compare maintained protocol implementations and their full wallet/consensus requirements; require expert review before protocol implementation. Do not invent cryptographic primitives.
+- [ ] **Define a small first release:** Scope wallet creation/recovery, receiving, sending, and confirmation for the selected audience. Keep current features local and test-only while privacy is unimplemented.
+- [ ] **Keep node rewards behind network design:** First build peer-to-peer validation and a reviewed way to measure useful service; do not reward self-reported uptime.
 
 Top-ups, cash-outs, merchant payments, network participation rewards, and a public network are future goals only. They are not supported until the prerequisite design, implementation, and independent reviews are complete.
 

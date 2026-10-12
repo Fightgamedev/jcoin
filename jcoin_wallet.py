@@ -6,8 +6,8 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat, load_der_private_key
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from jcoin_backup import create_backup, open_backup, open_legacy_native_backup
 
 APP = 'JCoin Wallet'
 CONFIG = Path.home()/'.config/jcoin-wallet.json'
@@ -78,11 +78,7 @@ class Wallet(Gtk.Application):
         self.unlock(private,path,'Wallet created. This encrypted backup works with the browser wallets too.')
     def write_compatible_backup(self,private,password,path,name):
         DATA.mkdir(mode=0o700,parents=True,exist_ok=True)
-        salt=os.urandom(16); iv=os.urandom(12); key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32)
-        private_der=private.private_bytes(Encoding.DER,PrivateFormat.PKCS8,NoEncryption())
-        encrypted=AESGCM(key).encrypt(iv,private_der,None)
-        public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
-        payload={'format':'jcoin-wallet','version':1,'name':name,'address':address(public),'publicKey':base64.b64encode(public).decode(),'kdf':'PBKDF2-SHA256-310000','cipher':'AES-256-GCM','salt':base64.b64encode(salt).decode(),'iv':base64.b64encode(iv).decode(),'encryptedPrivateKey':base64.b64encode(encrypted).decode()}
+        payload=create_backup(private,password,name)
         fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(fd,'w') as wallet_file:
             json.dump(payload,wallet_file,indent=2); wallet_file.write('\n'); wallet_file.flush(); os.fsync(wallet_file.fileno())
@@ -97,20 +93,11 @@ class Wallet(Gtk.Application):
         try:
             d=json.loads(p.read_text())
             if d.get('format')=='jcoin-wallet':
-                if d.get('version')!=1 or d.get('kdf')!='PBKDF2-SHA256-310000' or d.get('cipher')!='AES-256-GCM': raise ValueError('Unsupported backup format.')
-                salt=base64.b64decode(d['salt'],validate=True); iv=base64.b64decode(d['iv'],validate=True); encrypted=base64.b64decode(d['encryptedPrivateKey'],validate=True)
-                key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32); raw=AESGCM(key).decrypt(iv,encrypted,None)
-                private=load_der_private_key(raw,password=None)
-                if not isinstance(private,Ed25519PrivateKey): raise ValueError('Wallet key type is invalid.')
-                public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
-                if address(public)!=d.get('address') or base64.b64encode(public).decode()!=d.get('publicKey'): raise ValueError('Wallet key does not match its address.')
+                private=open_backup(d,password)
                 self.unlock(private,p,'Wallet unlocked. This backup is compatible with the browser wallets.')
             else:
                 # Read the original native wallet format and preserve it while writing a compatible copy.
-                salt=base64.b64decode(d['salt'],validate=True); nonce=base64.b64decode(d['nonce'],validate=True); encrypted=base64.b64decode(d['key'],validate=True)
-                key=hashlib.pbkdf2_hmac('sha256',password.encode(),salt,310000,32); raw=AESGCM(key).decrypt(nonce,encrypted,None)
-                private=Ed25519PrivateKey.from_private_bytes(raw)
-                public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
+                private=open_legacy_native_backup(d,password)
                 name='JCoin wallet'
                 target=DATA/('wallet-compatible-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(4)+'.jcoinwallet')
                 self.write_compatible_backup(private,password,target,name)
