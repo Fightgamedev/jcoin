@@ -13,3 +13,8 @@ Python dependencies are listed in `requirements.txt`. GTK4 and PyGObject must
 also be installed through the operating system's package manager.
 
 This is an experimental single-validator prototype. The ledger exposes sender addresses, recipient addresses, and amounts; encrypted key storage does not make transactions private. Use test coins only.
+
+The send form selects **Private (default)**, but private transfers are not
+implemented. To send a prototype transfer, explicitly select **Transparent
+test send** and confirm the warning; transaction details are visible to the
+node and anyone who can inspect its ledger.

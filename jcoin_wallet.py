@@ -41,6 +41,10 @@ class Wallet(Gtk.Application):
         self.addr=Gtk.Label(label='Create or open a wallet'); self.addr.set_xalign(0); self.addr.set_selectable(True); self.addr.add_css_class('muted'); card.append(self.addr)
         send=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=9); send.add_css_class('card'); root.append(send)
         label=Gtk.Label(label='Send JCOIN'); label.set_xalign(0); label.add_css_class('title'); send.append(label)
+        self.private_mode=Gtk.CheckButton(label='Private send (default; not implemented yet)'); self.private_mode.set_active(True); send.append(self.private_mode)
+        self.transparent_mode=Gtk.CheckButton(label='Transparent test send (available now)'); self.transparent_mode.set_group(self.private_mode); send.append(self.transparent_mode)
+        self.mode_note=Gtk.Label(label='Private is selected by default, but this prototype cannot send privately. Choose transparent mode to send a test transfer.'); self.mode_note.set_wrap(True); self.mode_note.set_xalign(0); self.mode_note.add_css_class('muted'); send.append(self.mode_note)
+        self.private_mode.connect('toggled',self.update_mode_note); self.transparent_mode.connect('toggled',self.update_mode_note)
         self.to=Gtk.Entry(); self.to.set_placeholder_text('Recipient address (JC + 40 hex characters)'); send.append(self.to)
         self.amount=Gtk.Entry(); self.amount.set_placeholder_text('Whole JCOIN amount'); send.append(self.amount)
         b=Gtk.Button(label='Sign and queue transfer'); b.add_css_class('accent'); b.connect('clicked',self.send); send.append(b)
@@ -89,16 +93,31 @@ class Wallet(Gtk.Application):
                 a=self.addr.get_text(); info=request(self.endpoint.get_text().rstrip()+'/api/balance?address='+urllib.parse.quote(a)); self.balance.set_text(str(info.get('balance',0))+' JCOIN')
             else: self.balance.set_text('Open a wallet to view balance')
         except Exception as exc: self.status.set_text('Node unavailable'); self.note('Start the JCoin node, then refresh. '+str(exc))
+    def update_mode_note(self,*_):
+        if self.private_mode.get_active():
+            self.mode_note.set_text('Private is selected by default, but this prototype cannot send privately. Choose transparent mode to send a test transfer.')
+        else:
+            self.mode_note.set_text('Transparent mode is selected. The node and ledger can expose the sender, recipient, amount, and timing.')
     def send(self,*_):
         if not self.key: self.note('Open or create a wallet first.'); return
+        if self.private_mode.get_active(): self.note('Private transfers are not implemented. No transfer was sent. Choose transparent test mode to continue.'); return
         try:
             amount=int(self.amount.get_text()); recipient=self.to.get_text().strip()
             if amount<=0 or len(recipient)!=42 or not recipient.startswith('JC') or any(c not in '0123456789abcdefABCDEF' for c in recipient[2:]): raise ValueError('Enter a valid address and positive whole amount.')
             recipient='JC'+recipient[2:].lower()
+            dialog=Gtk.MessageDialog(transient_for=self.window,modal=True,message_type=Gtk.MessageType.WARNING,buttons=Gtk.ButtonsType.NONE,text='Transparent test payment')
+            dialog.set_secondary_text(f'Send {amount} test JCOIN to {recipient}? The sender, recipient, amount, and timing will be visible to the node and anyone who can inspect its ledger. This cannot be made private after sending.')
+            dialog.add_button('Cancel',Gtk.ResponseType.CANCEL); dialog.add_button('Send transparently',Gtk.ResponseType.ACCEPT)
+            dialog.connect('response',lambda dlg,response:self._send_confirmed(dlg,response,recipient,amount)); dialog.present()
+        except Exception as e: self.note('Could not prepare transfer: '+str(e))
+    def _send_confirmed(self,dialog,response,recipient,amount):
+        dialog.destroy()
+        if response!=Gtk.ResponseType.ACCEPT: return
+        try:
             base=self.endpoint.get_text().rstrip('/'); a=self.addr.get_text(); acct=request(base+'/api/balance?address='+urllib.parse.quote(a)); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
             tx={'amount':amount,'from':a,'nonce':int(acct['nonce']),'pub':base64.b64encode(pub).decode(),'time':int(time.time()),'to':recipient}
             tx['sig']=base64.b64encode(self.key.sign(canonical(tx).encode('ascii'))).decode(); result=request(base+'/api/transaction',tx)
-            self.note('Transfer signed and queued: '+result.get('txid','')); self.refresh()
+            self.note('Transparent test transfer signed and queued: '+result.get('txid','')); self.refresh()
         except urllib.error.HTTPError as e:
             try: msg=json.loads(e.read()).get('error',str(e))
             except Exception: msg=str(e)

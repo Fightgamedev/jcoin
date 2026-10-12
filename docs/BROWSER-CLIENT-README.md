@@ -4,6 +4,11 @@
 private key only in an encrypted `.jcoinwallet` backup and signs transfers in
 the browser. The current node records sender addresses, recipient addresses, and amounts in cleartext; encrypted key storage does not make transactions private. Users need the validator operator's node URL to connect.
 
+The send form selects **Private (default)**, but private transfers are not
+implemented. To send a prototype transfer, explicitly select **Transparent
+test send** and confirm the disclosure prompt; the sender, recipient, amount,
+and timing can be visible in the ledger.
+
 The current node listens only on the validator's own laptop. It is not
 reachable by remote users. Do not publish it or expose it to the internet;
 remote access would require a publicly reachable HTTPS endpoint and a separate
