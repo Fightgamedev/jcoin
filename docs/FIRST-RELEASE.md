@@ -43,8 +43,9 @@ The test release should let one person, on the local prototype:
 
 1. Keep backup creation, recovery, wrong-password handling, and cross-client
    format checks reliable. **Current automated backup checks are in place.**
-2. Improve the local wallet's first-run, receive, and backup instructions for
-   the selected Japanese-speaking test audience.
+2. [x] Improve the dashboard's first-run, receive, and backup instructions
+   for the selected Japanese-speaking test audience; provide Japanese and
+   English labels with a remembered language choice.
 3. Add clear transfer lifecycle feedback using only states the node can
    actually verify; do not label a queued transfer as paid or confirmed.
 4. Keep transparent sends visibly marked as test-only, with explicit consent

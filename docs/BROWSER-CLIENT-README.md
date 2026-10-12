@@ -1,5 +1,21 @@
 # Standalone browser wallet
 
+The local dashboard is available in Japanese and English. It starts in
+Japanese when your browser language is Japanese, otherwise in English; use
+the language button in the header to switch. Your choice is saved in that
+browser.
+
+## ローカルダッシュボードを使う方へ
+
+画面上部の言語ボタンで日本語と英語を切り替えられます。日本語設定の
+ブラウザーでは、初回表示は日本語です。設定はそのブラウザーに保存されます。
+
+最初に「ブラウザーウォレットを作成」を選び、暗号化バックアップを保存して
+ください。受け取りには表示されたアドレスを共有します。送金画面では
+「プライベート」が初期選択ですが、非公開送金はまだ使えません。送金する
+場合は「公開テスト送金」を明示的に選んでください。取引の詳細は公開され、
+実際の資金には対応していません。
+
 `JCoin-Wallet.html` can be shared as a standalone wallet page. It stores the
 private key in an encrypted `.jcoinwallet` backup and signs transfers in the
 browser. The local dashboard also supports encrypted backup and restore for

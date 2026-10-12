@@ -78,6 +78,7 @@ These are the next concrete tasks, ordered by safety and dependency. The first i
 
 - [x] **Verify wallet backup interoperability:** Automated round-trip checks cover the shared browser/native backup format, wrong passwords, damaged metadata, and legacy native-file migration.
 - [x] **Choose the first audience and platform:** Start with Japanese-speaking, non-technical desktop testers of the local prototype; remote and mobile-only use wait for network and privacy readiness. See [first release scope](docs/FIRST-RELEASE.md).
+- [x] **Simplify first-run wallet guidance:** The local dashboard now supports Japanese and English, remembers the language choice, and presents the wallet setup, receive, backup, and privacy limitations in both languages.
 - [ ] **Settle the privacy architecture:** Compare maintained protocol implementations and their full wallet/consensus requirements; require expert review before protocol implementation. Do not invent cryptographic primitives.
 - [x] **Define a small first release:** Scope wallet creation/recovery, receiving, explicitly transparent test sending, and honest confirmation states for the selected audience. See [first release scope](docs/FIRST-RELEASE.md).
 - [ ] **Keep node rewards behind network design:** First build peer-to-peer validation and a reviewed way to measure useful service; do not reward self-reported uptime.
