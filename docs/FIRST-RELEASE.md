@@ -21,9 +21,10 @@ reviewed network and privacy design exist.
 The test release should let one person, on the local prototype:
 
 1. Create a wallet and save an encrypted backup, or restore one.
-2. See the wallet address and copy it to receive test coins.
-3. See a clear test balance and distinguish waiting transfers from confirmed
-   transfers.
+2. See and copy the wallet address; request a small amount of valueless test
+   coins from the local faucet.
+3. See a clear test balance and each transfer's pending, confirmed, or rejected
+   state.
 4. Choose transparent test sending only after a plain-language disclosure;
    private mode stays selected by default and must fail closed.
 5. See whether a transfer is waiting, confirmed, or rejected, with a useful

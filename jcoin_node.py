@@ -70,6 +70,11 @@ DB.execute("""CREATE TABLE IF NOT EXISTS blocks(
     signature TEXT NOT NULL)""")
 DB.execute("""CREATE TABLE IF NOT EXISTS pending(
     txid TEXT PRIMARY KEY, body TEXT NOT NULL)""")
+DB.execute("""CREATE TABLE IF NOT EXISTS rejected(
+    txid TEXT PRIMARY KEY, body TEXT NOT NULL, reason TEXT NOT NULL,
+    rejected_at INTEGER NOT NULL)""")
+DB.execute("""CREATE TABLE IF NOT EXISTS faucet_claims(
+    address TEXT PRIMARY KEY, txid TEXT NOT NULL, created_at INTEGER NOT NULL)""")
 DB.commit()
 
 
@@ -194,7 +199,64 @@ def get_account(address):
     incoming = sum(t["amount"] for t in pending if t["to"] == address)
     return {"address": address, "balance": balances.get(address, 0),
             "available": balances.get(address, 0) - reserved, "pending_in": incoming,
-            "nonce": nonces.get(address, 0) + sum(1 for t in pending if t["from"] == address)}
+            "nonce": nonces.get(address, 0) + sum(1 for t in pending if t["from"] == address),
+            "test_faucet_claimed": bool(DB.execute(
+                "SELECT 1 FROM faucet_claims WHERE address=?", (address,)).fetchone())}
+
+
+def transactions_for(address):
+    """Return the latest local prototype transfers involving one wallet."""
+    items = []
+
+    def add(tx, status, txid, block_height=None, reason=None):
+        outgoing = tx.get("from") == address
+        timestamp = tx.get("time")
+        items.append({
+            "txid": txid, "status": status, "direction": "sent" if outgoing else "received",
+            "amount": tx.get("amount", 0),
+            "counterparty": tx.get("to", "") if outgoing else tx.get("from", ""),
+            "time": timestamp if type(timestamp) is int else 0,
+            "block_height": block_height, "reason": reason,
+        })
+
+    for row in DB.execute("SELECT txid,body FROM pending"):
+        tx = json.loads(row["body"])
+        if isinstance(tx, dict) and (tx.get("from") == address or tx.get("to") == address):
+            add(tx, "pending", row["txid"])
+    for row in DB.execute("SELECT txid,body,reason,rejected_at FROM rejected"):
+        tx = json.loads(row["body"])
+        if isinstance(tx, dict) and (tx.get("from") == address or tx.get("to") == address):
+            add(tx, "rejected", row["txid"], reason=row["reason"])
+            items[-1]["time"] = row["rejected_at"]
+    block_rows = DB.execute("SELECT body FROM blocks ORDER BY height DESC LIMIT 1000").fetchall()
+    for row in reversed(block_rows):
+        block = json.loads(row["body"])
+        for tx in block["transactions"]:
+            if isinstance(tx, dict) and (tx.get("from") == address or tx.get("to") == address):
+                add(tx, "confirmed", sha256(canonical(tx).encode("ascii")), block["height"])
+    return sorted(items, key=lambda item: (item["time"], item["txid"]), reverse=True)[:50]
+
+
+def queue_master_transfer(target, amount):
+    """Queue a signed transfer from the local test faucet wallet."""
+    if isinstance(target, str) and len(target) == 42 and target[:2].upper() == "JC":
+        target = "JC" + target[2:].lower()
+    if (not isinstance(target, str) or len(target) != 42 or not target.startswith("JC")
+            or any(c not in "0123456789abcdef" for c in target[2:])
+            or type(amount) is not int or amount <= 0):
+        raise ValueError("Enter a valid destination and whole coin amount.")
+    account = get_account(MASTER_ADDR)
+    tx = {"amount": amount, "from": MASTER_ADDR, "nonce": account["nonce"],
+          "pub": MASTER_PUB_B64, "time": int(time.time()), "to": target}
+    tx["sig"] = base64.b64encode(
+        MASTER_KEY.sign(canonical(signable_tx(tx)).encode("ascii"))).decode("ascii")
+    balances, nonces, _ = balances_and_nonces()
+    pending = [json.loads(row["body"]) for row in DB.execute(
+        "SELECT body FROM pending ORDER BY rowid")]
+    validate_tx(tx, balances, nonces, pending)
+    txid = sha256(canonical(tx).encode("ascii"))
+    DB.execute("INSERT INTO pending VALUES(?,?)", (txid, canonical(tx)))
+    return txid
 
 
 def make_block():
@@ -203,15 +265,17 @@ def make_block():
             "SELECT body FROM pending ORDER BY rowid")]
         balances, nonces, minted = balances_and_nonces()
         accepted = []
+        rejected = []
         for tx in pending:
             try:
                 validate_tx(tx, balances, nonces, accepted)
                 accepted.append(tx)
-            except ValueError:
-                continue
+            except ValueError as exc:
+                txid = sha256(canonical(tx).encode("ascii"))
+                rejected.append((txid, canonical(tx), str(exc), int(time.time())))
         height = DB.execute("SELECT COALESCE(MAX(height),-1)+1 FROM blocks").fetchone()[0]
         reward = min(reward_at(height), max(0, COIN_CAP - minted))
-        if reward <= 0 and not accepted:
+        if reward <= 0 and not accepted and not rejected:
             raise ValueError("Supply cap reached; no transfers are waiting.")
         previous = DB.execute(
             "SELECT block_hash FROM blocks ORDER BY height DESC LIMIT 1").fetchone()["block_hash"]
@@ -221,10 +285,13 @@ def make_block():
         signature = base64.b64encode(MASTER_KEY.sign(bytes.fromhex(block_hash))).decode("ascii")
         DB.execute("INSERT INTO blocks VALUES(?,?,?,?)",
                    (height, canonical(block), block_hash, signature))
+        DB.executemany("INSERT OR REPLACE INTO rejected VALUES(?,?,?,?)", rejected)
+        DB.executemany("DELETE FROM faucet_claims WHERE txid=?",
+                       ((item[0],) for item in rejected))
         DB.execute("DELETE FROM pending")
         DB.commit()
         return {"height": height, "hash": block_hash, "reward": reward,
-                "confirmed": len(accepted)}
+                "confirmed": len(accepted), "rejected": len(rejected)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -299,6 +366,16 @@ class Handler(BaseHTTPRequestHandler):
         elif parsed.path == "/api/balance":
             address = parse_qs(parsed.query).get("address", [""])[0]
             self.send_json(200, get_account(address))
+        elif parsed.path == "/api/transactions":
+            if not self.local_operator():
+                self.send_json(403, {"error": "Transfer history is local-only."})
+                return
+            address = parse_qs(parsed.query).get("address", [""])[0]
+            if (not isinstance(address, str) or len(address) != 42 or not address.startswith("JC")
+                    or any(c not in "0123456789abcdef" for c in address[2:])):
+                self.send_json(400, {"error": "Enter a valid JCoin address."})
+                return
+            self.send_json(200, transactions_for(address))
         elif parsed.path == "/api/blocks":
             rows = DB.execute(
                 "SELECT body,block_hash,signature FROM blocks ORDER BY height DESC LIMIT 12"
@@ -337,26 +414,24 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.local_operator():
                     self.send_json(403, {"error": "Master wallet actions are local-only."})
                     return
-                target, amount = body.get("to", ""), body.get("amount")
-                if isinstance(target, str) and len(target) == 42 and target[:2].upper() == "JC":
-                    target = "JC" + target[2:].lower()
-                if (type(amount) is not int or amount <= 0 or not isinstance(target, str)
-                        or len(target) != 42 or not target.startswith("JC")
-                        or any(c not in "0123456789abcdef" for c in target[2:])):
-                    raise ValueError("Enter a valid destination and whole coin amount.")
-                account = get_account(MASTER_ADDR)
-                tx = {"amount": amount, "from": MASTER_ADDR, "nonce": account["nonce"],
-                      "pub": MASTER_PUB_B64, "time": int(time.time()), "to": target}
-                tx["sig"] = base64.b64encode(
-                    MASTER_KEY.sign(canonical(signable_tx(tx)).encode("ascii"))).decode("ascii")
-                balances, nonces, _ = balances_and_nonces()
-                pending = [json.loads(r["body"]) for r in DB.execute(
-                    "SELECT body FROM pending ORDER BY rowid")]
-                validate_tx(tx, balances, nonces, pending)
-                txid = sha256(canonical(tx).encode("ascii"))
-                DB.execute("INSERT INTO pending VALUES(?,?)", (txid, canonical(tx)))
-                DB.commit()
+                with LOCK:
+                    txid = queue_master_transfer(body.get("to", ""), body.get("amount"))
+                    DB.commit()
                 self.send_json(201, {"txid": txid, "queued": True})
+            elif self.path == "/api/test-faucet":
+                if not self.local_operator():
+                    self.send_json(403, {"error": "Test coin requests are local-only."})
+                    return
+                target = body.get("to", "")
+                with LOCK:
+                    if DB.execute("SELECT 1 FROM faucet_claims WHERE address=?", (target,)).fetchone():
+                        self.send_json(409, {"error": "This wallet has already requested its test coins."})
+                        return
+                    txid = queue_master_transfer(target, 100)
+                    DB.execute("INSERT INTO faucet_claims VALUES(?,?,?)",
+                               ("JC" + target[2:].lower(), txid, int(time.time())))
+                    DB.commit()
+                self.send_json(201, {"txid": txid, "queued": True, "amount": 100})
             elif self.path == "/api/validate":
                 if not self.local_operator():
                     self.send_json(403, {"error": "Only the laptop operator can validate blocks."})

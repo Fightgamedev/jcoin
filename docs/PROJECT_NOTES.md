@@ -3,6 +3,7 @@
 ## Current shape
 
 - `jcoin_node.py` runs a loopback-only HTTP node and validator.
+- The dashboard can request a one-time 100-JCOIN test transfer per browser-wallet address; the node stores transfer acceptance/rejection history for local display. Test coins have no value.
 - `index.html` is the bilingual project landing page hosted by the node.
 - `dashboard.html` is the local dashboard and browser wallet.
 - New dashboard, standalone browser, and native wallets share a password-encrypted `.jcoinwallet` format. The native client still reads its legacy format and writes a compatible copy; older dashboard wallets without a saved backup use non-extractable keys and cannot be exported by the dashboard.

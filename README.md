@@ -18,7 +18,7 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 
 ## Project layout
 
-- `jcoin_node.py`: loopback node, transaction validation, and block signing.
+- `jcoin_node.py`: loopback node, transaction validation, local test faucet, transfer history, and block signing.
 - `index.html`: bilingual Jcoin landing page and staged product roadmap.
 - `dashboard.html`: local node dashboard and browser wallet.
 - `JCoin-Wallet.html`: standalone encrypted-backup browser wallet.
@@ -32,6 +32,7 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - [Privacy protocol evaluation](docs/PRIVACY-PROTOCOL-EVALUATION.md): early Monero and Zcash model comparison and decision criteria; no protocol selected.
 - [Explicit privacy-mode protocol proposal](docs/JCOIN-EXPLICIT-PRIVACY-PROTOCOL.md): private-by-default design with a deliberate transparent option and fail-closed rules; research only.
 - [First release scope](docs/FIRST-RELEASE.md): initial audience, local test release tasks, acceptance goal, and explicit exclusions.
+- [Improvement backlog](docs/IMPROVEMENT-BACKLOG.md): prioritized gaps found in the current prototype and the planned work to address them.
 - [Network participation rewards](docs/NETWORK-INCENTIVES.md): a proposed path for rewarding people who run JCoin nodes; no public network or node rewards exist today.
 - `AGENTS.md` and `.github/agents/`: shared coding-agent rules and specialist roles. Start with the [beginner's guide to agents](docs/AGENTS-GUIDE.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
@@ -74,16 +75,23 @@ The goal is to grow JCoin from a local wallet prototype toward privacy-first eve
 
 ## Next work queue
 
-These are the next concrete tasks, ordered by safety and dependency. The first item is complete; the remaining items are open product and architecture work.
+These are the next concrete tasks, ordered by safety and dependency. Backup interoperability, initial audience, first-run language, and first-release scope are complete. Test funding and transaction status are active; privacy and network work remain design tasks.
 
 - [x] **Verify wallet backup interoperability:** Automated round-trip checks cover the shared browser/native backup format, wrong passwords, damaged metadata, and legacy native-file migration.
 - [x] **Choose the first audience and platform:** Start with Japanese-speaking, non-technical desktop testers of the local prototype; remote and mobile-only use wait for network and privacy readiness. See [first release scope](docs/FIRST-RELEASE.md).
 - [x] **Simplify first-run wallet guidance:** The local dashboard now supports Japanese and English, remembers the language choice, and presents the wallet setup, receive, backup, and privacy limitations in both languages.
 - [ ] **Settle the privacy architecture:** Compare maintained protocol implementations and their full wallet/consensus requirements; require expert review before protocol implementation. Do not invent cryptographic primitives.
 - [x] **Define a small first release:** Scope wallet creation/recovery, receiving, explicitly transparent test sending, and honest confirmation states for the selected audience. See [first release scope](docs/FIRST-RELEASE.md).
-- [ ] **Keep node rewards behind network design:** First build peer-to-peer validation and a reviewed way to measure useful service; do not reward self-reported uptime.
+- [ ] **Make the first wallet usable:** Add a clearly labeled, local-only, capped test-funding action for new browser wallets.
+- [ ] **Show transfer lifecycle:** Let users see their own pending, confirmed, and rejected test transfers, with clear reasons and no false “paid” state.
+- [ ] **Validate the ledger rules:** Expand startup chain checks to verify transaction signatures, nonces, balances, rewards, and supply rules, not only block links and validator signatures.
+- [ ] **Protect and document node recovery:** Review the unencrypted validator key at rest and define a safe backup/restore procedure for node data.
+- [ ] **Cover core behavior:** Add node and wallet-flow coverage for funding, transfer validation, confirmation/rejection, and startup recovery; manually verify the Japanese/English dashboard.
+- [ ] **Make the implementation easier to maintain:** Split the dashboard's embedded UI and logic into reviewable modules and remove compressed one-line code where practical.
+- [ ] **Research privacy and network architecture:** Compare maintained protocol options, define validator and metadata assumptions, and design peer-to-peer validation before implementing either. No custom cryptography or public deployment yet.
+- [ ] **Review rewards and launch readiness:** Keep third-party node rewards, remote service, merchant payments, and real funds blocked on consensus, abuse resistance, security/privacy, and legal review.
 
-Top-ups, cash-outs, merchant payments, network participation rewards, and a public network are future goals only. They are not supported until the prerequisite design, implementation, and independent reviews are complete.
+Real-money top-ups, cash-outs, merchant payments, network participation rewards, and a public network are future goals only. A local test faucet is for valueless prototype coins only. The other features are not supported until their prerequisite designs, implementations, and independent reviews are complete.
 
 ### CodeQ experiment
 
