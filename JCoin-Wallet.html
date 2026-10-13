@@ -51,7 +51,16 @@ async function connect(){
  $("send").disabled=!wallet;
  const blocks=await api("/api/blocks"),host=$("activity");
  if(!blocks.length){host.className="empty";host.textContent="No blocks yet.";}
- else{host.className="";host.innerHTML=blocks.slice().reverse().map(b=>'<div class="activity"><div class="icon">◆</div><div class="info"><div class="title">Block #'+b.height+' · validator signed</div><div class="meta">'+new Date(b.time*1000).toLocaleString()+' · '+b.transactions+' transfers · '+b.hash.slice(0,16)+'…</div></div></div>').join("");}
+ else{
+  host.className="";host.replaceChildren();
+  blocks.slice().reverse().forEach(b=>{
+   const item=document.createElement("div"),icon=document.createElement("div"),info=document.createElement("div"),title=document.createElement("div"),meta=document.createElement("div");
+   item.className="activity";icon.className="icon";icon.textContent="◆";info.className="info";title.className="title";meta.className="meta";
+   title.textContent="Block #"+String(b.height)+" · validator signed";
+   meta.textContent=new Date(Number(b.time)*1000).toLocaleString()+" · "+String(b.transactions)+" transfers · "+String(b.hash).slice(0,16)+"…";
+   info.append(title,meta);item.append(icon,info);host.append(item);
+  });
+ }
  await updateBalance();
  if(nodeTimer)clearInterval(nodeTimer);nodeTimer=setInterval(()=>connect().catch(()=>{ $("dot").classList.remove("on");$("connLabel").textContent="Node offline";}),10000);
 }

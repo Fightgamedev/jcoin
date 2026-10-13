@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import stat
 import threading
 import time
 import webbrowser
@@ -17,7 +18,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "node-data"
+# The override also lets automated checks use a disposable ledger without
+# touching an operator's real local chain. Normal runs keep the historical path.
+DATA = Path(os.environ.get("JCOIN_DATA_DIR", ROOT / "node-data")).expanduser()
 DB_PATH = DATA / "jcoin.sqlite3"
 KEY_PATH = DATA / "master-validator.key"
 LANDING = ROOT / "index.html"
@@ -27,6 +30,13 @@ COIN_CAP = 84_000_000
 INITIAL_REWARD = 50
 HALVING_INTERVAL = 840_000
 LOCK = threading.RLock()
+TRUSTED_BROWSER_ORIGINS = frozenset(("http://127.0.0.1:8765", "http://localhost:8765"))
+
+
+def local_operator_allowed(client_ip, origin, *, allow_missing_origin=False):
+    if client_ip not in ("127.0.0.1", "::1"):
+        return False
+    return origin in TRUSTED_BROWSER_ORIGINS or (allow_missing_origin and origin is None)
 
 
 def canonical(value):
@@ -43,8 +53,28 @@ def address_for(public_key):
 
 def load_or_create_key():
     DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if os.name == "posix":
+        if not stat.S_ISDIR(DATA.lstat().st_mode):
+            raise RuntimeError("JCoin data path must be a real directory, not a symlink.")
+        os.chmod(DATA, 0o700)
     if KEY_PATH.exists():
-        return Ed25519PrivateKey.from_private_bytes(KEY_PATH.read_bytes())
+        if stat.S_ISLNK(KEY_PATH.lstat().st_mode):
+            raise RuntimeError("JCoin validator key must not be a symlink.")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(KEY_PATH, flags)
+        try:
+            key_stat = os.fstat(fd)
+            if not stat.S_ISREG(key_stat.st_mode):
+                raise RuntimeError("JCoin validator key must be a regular file.")
+            if os.name == "posix":
+                os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "rb") as key_file:
+                fd = -1
+                raw_key = key_file.read()
+        finally:
+            if fd >= 0:
+                os.close(fd)
+        return Ed25519PrivateKey.from_private_bytes(raw_key)
     key = Ed25519PrivateKey.generate()
     raw = key.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
                             serialization.NoEncryption())
@@ -88,27 +118,31 @@ def reward_at(height):
 
 
 def all_blocks():
-    return [json.loads(row["body"]) for row in DB.execute(
-        "SELECT body FROM blocks ORDER BY height")]
+    with LOCK:
+        return [json.loads(row["body"]) for row in DB.execute(
+            "SELECT body FROM blocks ORDER BY height")]
 
 
 def balances_and_nonces():
-    balances, nonces, minted = {}, {}, 0
-    for block in all_blocks():
-        if block["reward"]:
-            addr = block["validator"]
-            balances[addr] = balances.get(addr, 0) + block["reward"]
-            minted += block["reward"]
-        for tx in block["transactions"]:
-            balances[tx["from"]] = balances.get(tx["from"], 0) - tx["amount"]
-            balances[tx["to"]] = balances.get(tx["to"], 0) + tx["amount"]
-            nonces[tx["from"]] = tx["nonce"] + 1
-    return balances, nonces, minted
+    with LOCK:
+        balances, nonces, minted = {}, {}, 0
+        for block in all_blocks():
+            if block["reward"]:
+                addr = block["validator"]
+                balances[addr] = balances.get(addr, 0) + block["reward"]
+                minted += block["reward"]
+            for tx in block["transactions"]:
+                balances[tx["from"]] = balances.get(tx["from"], 0) - tx["amount"]
+                balances[tx["to"]] = balances.get(tx["to"], 0) + tx["amount"]
+                nonces[tx["from"]] = tx["nonce"] + 1
+        return balances, nonces, minted
 
 
-def validate_tx(tx, balances, nonces, pending_spent):
+def validate_tx(tx, balances, nonces, pending_spent, *, check_timestamp=True):
     if not isinstance(tx, dict):
         raise ValueError("Transaction must be an object.")
+    if set(tx) != {"amount", "from", "nonce", "pub", "sig", "time", "to"}:
+        raise ValueError("Transaction contains missing or unsupported fields.")
     try:
         amount, nonce = tx["amount"], tx["nonce"]
         sender, recipient = tx["from"], tx["to"]
@@ -121,8 +155,10 @@ def validate_tx(tx, balances, nonces, pending_spent):
         raise ValueError("Amount must be a positive whole number of JCOIN.")
     if type(nonce) is not int or nonce < 0 or type(stamp) is not int:
         raise ValueError("Invalid transaction nonce or timestamp.")
-    if abs(int(time.time()) - stamp) > 7 * 24 * 60 * 60:
+    if stamp < 0 or (check_timestamp and abs(int(time.time()) - stamp) > 7 * 24 * 60 * 60):
         raise ValueError("Transaction timestamp is out of date.")
+    if len(pub) != 32 or len(signature) != 64:
+        raise ValueError("Transaction public key or signature has an invalid length.")
     if (not isinstance(sender, str) or not isinstance(recipient, str)
             or not sender.startswith("JC") or len(sender) != 42
             or not recipient.startswith("JC") or len(recipient) != 42
@@ -147,65 +183,108 @@ def validate_tx(tx, balances, nonces, pending_spent):
 
 
 def chain_status():
-    blocks = all_blocks()
-    balances, _, minted = balances_and_nonces()
-    pending = DB.execute("SELECT COUNT(*) FROM pending").fetchone()[0]
-    height = len(blocks) - 1
-    return {
-        "height": height, "blocks": len(blocks), "pending": pending,
-        "master": MASTER_ADDR, "master_balance": balances.get(MASTER_ADDR, 0),
-        "minted": minted, "cap": COIN_CAP,
-        "next_reward": min(reward_at(height + 1), max(0, COIN_CAP - minted)),
-        "validator": MASTER_ADDR, "validator_public_key": MASTER_PUB_B64,
-        "network": "JCoin local prototype",
-    }
+    with LOCK:
+        blocks = all_blocks()
+        balances, _, minted = balances_and_nonces()
+        pending = DB.execute("SELECT COUNT(*) FROM pending").fetchone()[0]
+        height = len(blocks) - 1
+        return {
+            "height": height, "blocks": len(blocks), "pending": pending,
+            "master": MASTER_ADDR, "master_balance": balances.get(MASTER_ADDR, 0),
+            "minted": minted, "cap": COIN_CAP,
+            "next_reward": min(reward_at(height + 1), max(0, COIN_CAP - minted)),
+            "validator": MASTER_ADDR, "validator_public_key": MASTER_PUB_B64,
+            "network": "JCoin local prototype",
+        }
 
 
 def initialize_chain():
-    if DB.execute("SELECT COUNT(*) FROM blocks").fetchone()[0]:
-        return
-    body = {"height": 0, "time": int(time.time()), "previous": "0" * 64,
-            "transactions": [], "reward": 0, "validator": MASTER_ADDR}
-    block_hash = sha256(canonical(body).encode("ascii"))
-    signature = base64.b64encode(MASTER_KEY.sign(bytes.fromhex(block_hash))).decode("ascii")
-    DB.execute("INSERT INTO blocks VALUES(?,?,?,?)",
-               (0, canonical(body), block_hash, signature))
-    DB.commit()
+    with LOCK, DB:
+        if DB.execute("SELECT COUNT(*) FROM blocks").fetchone()[0]:
+            return
+        body = {"height": 0, "time": int(time.time()), "previous": "0" * 64,
+                "transactions": [], "reward": 0, "validator": MASTER_ADDR}
+        block_hash = sha256(canonical(body).encode("ascii"))
+        signature = base64.b64encode(MASTER_KEY.sign(bytes.fromhex(block_hash))).decode("ascii")
+        DB.execute("INSERT INTO blocks VALUES(?,?,?,?)",
+                   (0, canonical(body), block_hash, signature))
+
+
+def verify_database_integrity():
+    """Fail closed on SQLite structural damage; never attempt automatic repair."""
+    results = DB.execute("PRAGMA quick_check").fetchall()
+    if len(results) != 1 or results[0][0] != "ok":
+        raise RuntimeError("JCoin database integrity check failed; preserve the data and restore a known-good backup.")
 
 
 def verify_chain():
-    previous = "0" * 64
-    rows = DB.execute("SELECT height,body,block_hash,signature FROM blocks ORDER BY height").fetchall()
-    for height, row in enumerate(rows):
-        block = json.loads(row["body"])
-        if block["height"] != height or block["previous"] != previous:
-            raise RuntimeError("JCoin chain link or height is invalid.")
-        block_hash = sha256(canonical(block).encode("ascii"))
-        if block_hash != row["block_hash"]:
-            raise RuntimeError("Block data does not match its hash.")
-        try:
-            MASTER_KEY.public_key().verify(base64.b64decode(row["signature"]),
-                                           bytes.fromhex(block_hash))
-        except (InvalidSignature, ValueError) as exc:
-            raise RuntimeError("Block validator signature is invalid.") from exc
-        previous = block_hash
+    with LOCK:
+        verify_database_integrity()
+        previous = "0" * 64
+        balances, nonces, minted = {}, {}, 0
+        rows = DB.execute("SELECT height,body,block_hash,signature FROM blocks ORDER BY height").fetchall()
+        if not rows:
+            raise RuntimeError("JCoin chain is missing its genesis block.")
+        for height, row in enumerate(rows):
+            try:
+                block = json.loads(row["body"])
+                if (not isinstance(block, dict)
+                        or set(block) != {"height", "time", "previous", "transactions", "reward", "validator"}
+                        or row["height"] != height or type(block["height"]) is not int
+                        or block["height"] != height or type(block["time"]) is not int
+                        or block["previous"] != previous or block["validator"] != MASTER_ADDR
+                        or type(block["reward"]) is not int or block["reward"] < 0
+                        or not isinstance(block["transactions"], list)):
+                    raise RuntimeError("JCoin chain structure or link is invalid.")
+                block_hash = sha256(canonical(block).encode("ascii"))
+                if block_hash != row["block_hash"]:
+                    raise RuntimeError("Block data does not match its hash.")
+                signature = base64.b64decode(row["signature"], validate=True)
+                MASTER_KEY.public_key().verify(signature, bytes.fromhex(block_hash))
+                if height == 0:
+                    if block["reward"] != 0 or block["transactions"]:
+                        raise RuntimeError("JCoin genesis block is invalid.")
+                else:
+                    expected_reward = min(reward_at(height), max(0, COIN_CAP - minted))
+                    if block["reward"] != expected_reward:
+                        raise RuntimeError("Block reward does not match the issuance schedule.")
+                    for tx in block["transactions"]:
+                        validate_tx(tx, balances, nonces, [], check_timestamp=False)
+                        balances[tx["from"]] = balances.get(tx["from"], 0) - tx["amount"]
+                        balances[tx["to"]] = balances.get(tx["to"], 0) + tx["amount"]
+                        nonces[tx["from"]] = tx["nonce"] + 1
+                    balances[MASTER_ADDR] = balances.get(MASTER_ADDR, 0) + block["reward"]
+                    minted += block["reward"]
+                    if minted > COIN_CAP:
+                        raise RuntimeError("JCoin issuance exceeds the supply cap.")
+                previous = block_hash
+            except RuntimeError:
+                raise
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError, InvalidSignature) as exc:
+                raise RuntimeError("JCoin chain contains an invalid block or transaction.") from exc
 
 
 def get_account(address):
-    balances, nonces, _ = balances_and_nonces()
-    pending = [json.loads(r["body"]) for r in DB.execute(
-        "SELECT body FROM pending ORDER BY rowid")]
-    reserved = sum(t["amount"] for t in pending if t["from"] == address)
-    incoming = sum(t["amount"] for t in pending if t["to"] == address)
-    return {"address": address, "balance": balances.get(address, 0),
-            "available": balances.get(address, 0) - reserved, "pending_in": incoming,
-            "nonce": nonces.get(address, 0) + sum(1 for t in pending if t["from"] == address),
-            "test_faucet_claimed": bool(DB.execute(
-                "SELECT 1 FROM faucet_claims WHERE address=?", (address,)).fetchone())}
+    with LOCK:
+        balances, nonces, _ = balances_and_nonces()
+        pending = [json.loads(r["body"]) for r in DB.execute(
+            "SELECT body FROM pending ORDER BY rowid")]
+        reserved = sum(t["amount"] for t in pending if t["from"] == address)
+        incoming = sum(t["amount"] for t in pending if t["to"] == address)
+        return {"address": address, "balance": balances.get(address, 0),
+                "available": balances.get(address, 0) - reserved, "pending_in": incoming,
+                "nonce": nonces.get(address, 0) + sum(1 for t in pending if t["from"] == address),
+                "test_faucet_claimed": bool(DB.execute(
+                    "SELECT 1 FROM faucet_claims WHERE address=?", (address,)).fetchone())}
 
 
 def transactions_for(address):
     """Return the latest local prototype transfers involving one wallet."""
+    with LOCK:
+        return _transactions_for_locked(address)
+
+
+def _transactions_for_locked(address):
     items = []
 
     def add(tx, status, txid, block_height=None, reason=None):
@@ -283,13 +362,13 @@ def make_block():
                  "transactions": accepted, "reward": reward, "validator": MASTER_ADDR}
         block_hash = sha256(canonical(block).encode("ascii"))
         signature = base64.b64encode(MASTER_KEY.sign(bytes.fromhex(block_hash))).decode("ascii")
-        DB.execute("INSERT INTO blocks VALUES(?,?,?,?)",
-                   (height, canonical(block), block_hash, signature))
-        DB.executemany("INSERT OR REPLACE INTO rejected VALUES(?,?,?,?)", rejected)
-        DB.executemany("DELETE FROM faucet_claims WHERE txid=?",
-                       ((item[0],) for item in rejected))
-        DB.execute("DELETE FROM pending")
-        DB.commit()
+        with DB:
+            DB.execute("INSERT INTO blocks VALUES(?,?,?,?)",
+                       (height, canonical(block), block_hash, signature))
+            DB.executemany("INSERT OR REPLACE INTO rejected VALUES(?,?,?,?)", rejected)
+            DB.executemany("DELETE FROM faucet_claims WHERE txid=?",
+                           ((item[0],) for item in rejected))
+            DB.execute("DELETE FROM pending")
         return {"height": height, "hash": block_hash, "reward": reward,
                 "confirmed": len(accepted), "rejected": len(rejected)}
 
@@ -309,10 +388,13 @@ class Handler(BaseHTTPRequestHandler):
         print("%s - %s" % (self.address_string(), fmt % safe_args), flush=True)
 
     def local_operator(self):
-        origin = self.headers.get("Origin")
-        trusted_origins = (None, "http://127.0.0.1:8765", "http://localhost:8765")
-        return (self.client_address[0] in ("127.0.0.1", "::1")
-                and origin in trusted_origins)
+        # Missing Origin is permitted for local read-only clients, whose GET
+        # requests may omit it. It is not accepted for administrative writes.
+        return local_operator_allowed(
+            self.client_address[0], self.headers.get("Origin"), allow_missing_origin=True)
+
+    def local_browser_operator(self):
+        return local_operator_allowed(self.client_address[0], self.headers.get("Origin"))
 
     def send_json(self, code, value):
         data = json.dumps(value, separators=(",", ":")).encode()
@@ -377,22 +459,24 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send_json(200, transactions_for(address))
         elif parsed.path == "/api/blocks":
-            rows = DB.execute(
-                "SELECT body,block_hash,signature FROM blocks ORDER BY height DESC LIMIT 12"
-            ).fetchall()
-            result = []
-            for row in reversed(rows):
-                block = json.loads(row["body"])
-                result.append({"height": block["height"], "time": block["time"],
-                    "previous": block["previous"], "hash": row["block_hash"],
-                    "signature": row["signature"], "validator": block["validator"],
-                    "reward": block["reward"], "transactions": len(block["transactions"])})
+            with LOCK:
+                rows = DB.execute(
+                    "SELECT body,block_hash,signature FROM blocks ORDER BY height DESC LIMIT 12"
+                ).fetchall()
+                result = []
+                for row in reversed(rows):
+                    block = json.loads(row["body"])
+                    result.append({"height": block["height"], "time": block["time"],
+                        "previous": block["previous"], "hash": row["block_hash"],
+                        "signature": row["signature"], "validator": block["validator"],
+                        "reward": block["reward"], "transactions": len(block["transactions"])})
             self.send_json(200, result)
         elif parsed.path == "/api/pending":
             if not self.local_operator():
                 self.send_json(403, {"error": "Pending transaction details are local-only."})
                 return
-            rows = DB.execute("SELECT body FROM pending ORDER BY rowid").fetchall()
+            with LOCK:
+                rows = DB.execute("SELECT body FROM pending ORDER BY rowid").fetchall()
             self.send_json(200, [json.loads(r["body"]) for r in rows])
         else:
             self.send_json(404, {"error": "Not found."})
@@ -407,19 +491,19 @@ class Handler(BaseHTTPRequestHandler):
                         "SELECT body FROM pending ORDER BY rowid")]
                     validate_tx(body, balances, nonces, pending)
                     txid = sha256(canonical(body).encode("ascii"))
-                    DB.execute("INSERT INTO pending VALUES(?,?)", (txid, canonical(body)))
-                    DB.commit()
+                    with DB:
+                        DB.execute("INSERT INTO pending VALUES(?,?)", (txid, canonical(body)))
                 self.send_json(201, {"txid": txid, "queued": True})
             elif self.path == "/api/master/send":
-                if not self.local_operator():
+                if not self.local_browser_operator():
                     self.send_json(403, {"error": "Master wallet actions are local-only."})
                     return
                 with LOCK:
-                    txid = queue_master_transfer(body.get("to", ""), body.get("amount"))
-                    DB.commit()
+                    with DB:
+                        txid = queue_master_transfer(body.get("to", ""), body.get("amount"))
                 self.send_json(201, {"txid": txid, "queued": True})
             elif self.path == "/api/test-faucet":
-                if not self.local_operator():
+                if not self.local_browser_operator():
                     self.send_json(403, {"error": "Test coin requests are local-only."})
                     return
                 target = body.get("to", "")
@@ -427,13 +511,13 @@ class Handler(BaseHTTPRequestHandler):
                     if DB.execute("SELECT 1 FROM faucet_claims WHERE address=?", (target,)).fetchone():
                         self.send_json(409, {"error": "This wallet has already requested its test coins."})
                         return
-                    txid = queue_master_transfer(target, 100)
-                    DB.execute("INSERT INTO faucet_claims VALUES(?,?,?)",
-                               ("JC" + target[2:].lower(), txid, int(time.time())))
-                    DB.commit()
+                    with DB:
+                        txid = queue_master_transfer(target, 100)
+                        DB.execute("INSERT INTO faucet_claims VALUES(?,?,?)",
+                                   ("JC" + target[2:].lower(), txid, int(time.time())))
                 self.send_json(201, {"txid": txid, "queued": True, "amount": 100})
             elif self.path == "/api/validate":
-                if not self.local_operator():
+                if not self.local_browser_operator():
                     self.send_json(403, {"error": "Only the laptop operator can validate blocks."})
                     return
                 self.send_json(200, make_block())

@@ -41,16 +41,19 @@ Rebuild the standalone wallet bundle with `./build-client.sh` after changing its
 
 ## Development checks
 
-Run the wallet-backup checks with:
+Run the automated unit and interoperability checks with:
 
 ```sh
 python3 -m unittest discover -s tests -v
 ```
 
-The Python/native checks use the project requirements. The browser WebCrypto
-interoperability checks also use Node.js; Python skips those two checks when
-Node.js is unavailable. These checks cover backup serialization and recovery,
-not payment privacy or blockchain consensus.
+The suite covers encrypted backup interoperability, isolated ledger validation,
+SQLite integrity failure handling and rollback behavior, POSIX validator-key
+permissions, the whole-coin issuance schedule, and CodeQ allocation
+determinism. Browser WebCrypto checks use Node.js; Python skips those two checks
+when Node.js is unavailable.
+This is prototype regression coverage, not an independent security review or
+evidence of payment privacy or distributed consensus.
 
 ## Working with AI agents
 
@@ -75,18 +78,18 @@ The goal is to grow JCoin from a local wallet prototype toward privacy-first eve
 
 ## Next work queue
 
-These are the next concrete tasks, ordered by safety and dependency. Backup interoperability, initial audience, first-run language, and first-release scope are complete. Test funding and transaction status are active; privacy and network work remain design tasks.
+These are the next concrete tasks, ordered by safety and dependency. Backup interoperability, initial audience, first-run language, first-release scope, basic ledger checks, and regression coverage are complete. Privacy, recovery, and network work remain design tasks.
 
 - [x] **Verify wallet backup interoperability:** Automated round-trip checks cover the shared browser/native backup format, wrong passwords, damaged metadata, and legacy native-file migration.
 - [x] **Choose the first audience and platform:** Start with Japanese-speaking, non-technical desktop testers of the local prototype; remote and mobile-only use wait for network and privacy readiness. See [first release scope](docs/FIRST-RELEASE.md).
 - [x] **Simplify first-run wallet guidance:** The local dashboard now supports Japanese and English, remembers the language choice, and presents the wallet setup, receive, backup, and privacy limitations in both languages.
 - [ ] **Settle the privacy architecture:** Compare maintained protocol implementations and their full wallet/consensus requirements; require expert review before protocol implementation. Do not invent cryptographic primitives.
 - [x] **Define a small first release:** Scope wallet creation/recovery, receiving, explicitly transparent test sending, and honest confirmation states for the selected audience. See [first release scope](docs/FIRST-RELEASE.md).
-- [ ] **Make the first wallet usable:** Add a clearly labeled, local-only, capped test-funding action for new browser wallets.
-- [ ] **Show transfer lifecycle:** Let users see their own pending, confirmed, and rejected test transfers, with clear reasons and no false “paid” state.
-- [ ] **Validate the ledger rules:** Expand startup chain checks to verify transaction signatures, nonces, balances, rewards, and supply rules, not only block links and validator signatures.
+- [x] **Make the first wallet usable:** Add a clearly labeled, local-only, capped test-funding action for new browser wallets.
+- [x] **Show transfer lifecycle:** Let users see their own pending, confirmed, and rejected test transfers, with clear reasons and no false “paid” state.
+- [x] **Validate the ledger rules:** Startup checks now verify transaction signatures, nonce order, available balances, rewards, and supply rules as well as block links and validator signatures.
 - [ ] **Protect and document node recovery:** Review the unencrypted validator key at rest and define a safe backup/restore procedure for node data.
-- [ ] **Cover core behavior:** Add node and wallet-flow coverage for funding, transfer validation, confirmation/rejection, and startup recovery; manually verify the Japanese/English dashboard.
+- [ ] **Cover core behavior:** Ledger regression coverage now exercises signed transfers, nonce replay, invalid unsigned fields, issuance-rule corruption, and failed-write rollback in an isolated data directory. Add faucet/rejection/restart tests and manually verify the Japanese/English dashboard.
 - [ ] **Make the implementation easier to maintain:** Split the dashboard's embedded UI and logic into reviewable modules and remove compressed one-line code where practical.
 - [ ] **Research privacy and network architecture:** Compare maintained protocol options, define validator and metadata assumptions, and design peer-to-peer validation before implementing either. No custom cryptography or public deployment yet.
 - [ ] **Review rewards and launch readiness:** Keep third-party node rewards, remote service, merchant payments, and real funds blocked on consensus, abuse resistance, security/privacy, and legal review.
@@ -99,6 +102,6 @@ CodeQ (Conserved-Quanta Payment Code) is a proposed declarative language for exp
 
 ## What this is
 
-This is a small, centrally operated blockchain prototype. Blocks are linked by SHA-256 hashes and signed by the one validator key on your laptop. User transfers use Ed25519 signatures. The issuance defaults are Litecoin-like (50 JCOIN per block, halving every 840,000 blocks, 84,000,000 cap); they are prototype settings, not a launch specification.
+This is a small, centrally operated blockchain prototype. Blocks are linked by SHA-256 hashes and signed by the one validator key on your laptop. User transfers use Ed25519 signatures. The issuance defaults are Litecoin-like (50 JCOIN per block, halving every 840,000 blocks, 84,000,000 hard ceiling); they are prototype settings, not a launch specification. Because rewards are truncated to whole JCOIN at each halving, the current schedule can issue at most 81,479,950 JCOIN; the 84-million ceiling is not reached. Changing units or issuance requires an explicit, versioned monetary-policy decision.
 
 This is not Bitcoin or Litecoin consensus and is not decentralized: users trust your validator, and one machine controls block production. The current version listens only on your own laptop. The dashboard defaults to a private-send choice, but private sending is not implemented; a transfer is only sent after explicitly choosing transparent test mode. Its prototype block reward goes to the local validator wallet; it does not reward other computers or measure uptime. Transaction details are visible in its ledger and it has not been reviewed for security or privacy. JCOIN has no real-world value. Do not expose the node to the internet or use real funds.

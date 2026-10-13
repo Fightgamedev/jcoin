@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  wallet-backup:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -26,5 +26,5 @@ jobs:
           node-version: "20"
       - name: Install Python requirements
         run: python -m pip install -r requirements.txt
-      - name: Run wallet backup checks
+      - name: Run unit and interoperability checks
         run: python -m unittest discover -s tests -v
