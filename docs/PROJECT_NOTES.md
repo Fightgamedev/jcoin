@@ -22,6 +22,7 @@
 - `jcoin_wallet.py` is the GTK4 native wallet.
 - `run-jcoin.sh` and `run-wallet.sh` are the shell launchers.
 - `node-data/` is generated local state. It contains the validator key and must never be committed or shared.
+- [Node recovery guide](NODE-RECOVERY.md) documents a clean-stop full-directory backup and a restore that preserves the previous data. The key remains unencrypted at rest.
 
 ## Protocol details
 
@@ -58,7 +59,7 @@
 - The node's storage and API have not had a security audit.
 - The native client requires GTK4 and PyGObject from the operating system in addition to Python packages.
 - `python3 -m unittest discover -s tests -v` runs wallet backup, isolated
-  ledger, CodeQ allocation, issuance schedule, database integrity, and POSIX
-  key-permission regression checks. Node.js is optional; cross-runtime
-  WebCrypto checks are skipped when it is unavailable. These are not a full
-  chain, consensus, or privacy-protocol test suite.
+  ledger/faucet/rejection/restart, CodeQ allocation, issuance schedule,
+  database integrity, and POSIX key-permission regression checks. Node.js is
+  optional; cross-runtime WebCrypto checks are skipped when it is unavailable.
+  These are not a full chain, consensus, or privacy-protocol test suite.

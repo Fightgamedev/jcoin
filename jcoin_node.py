@@ -338,6 +338,26 @@ def queue_master_transfer(target, amount):
     return txid
 
 
+class FaucetAlreadyClaimed(ValueError):
+    """Raised when a wallet repeats its one-time local test-faucet request."""
+
+
+def request_test_faucet(target):
+    if isinstance(target, str) and len(target) == 42 and target[:2].upper() == "JC":
+        target = "JC" + target[2:].lower()
+    if (not isinstance(target, str) or len(target) != 42 or not target.startswith("JC")
+            or any(c not in "0123456789abcdef" for c in target[2:])):
+        raise ValueError("Enter a valid JCoin address.")
+    with LOCK:
+        if DB.execute("SELECT 1 FROM faucet_claims WHERE address=?", (target,)).fetchone():
+            raise FaucetAlreadyClaimed("This wallet has already requested its test coins.")
+        with DB:
+            txid = queue_master_transfer(target, 100)
+            DB.execute("INSERT INTO faucet_claims VALUES(?,?,?)",
+                       (target, txid, int(time.time())))
+        return txid
+
+
 def make_block():
     with LOCK:
         pending = [json.loads(r["body"]) for r in DB.execute(
@@ -507,14 +527,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(403, {"error": "Test coin requests are local-only."})
                     return
                 target = body.get("to", "")
-                with LOCK:
-                    if DB.execute("SELECT 1 FROM faucet_claims WHERE address=?", (target,)).fetchone():
-                        self.send_json(409, {"error": "This wallet has already requested its test coins."})
-                        return
-                    with DB:
-                        txid = queue_master_transfer(target, 100)
-                        DB.execute("INSERT INTO faucet_claims VALUES(?,?,?)",
-                                   ("JC" + target[2:].lower(), txid, int(time.time())))
+                try:
+                    txid = request_test_faucet(target)
+                except FaucetAlreadyClaimed as exc:
+                    self.send_json(409, {"error": str(exc)})
+                    return
                 self.send_json(201, {"txid": txid, "queued": True, "amount": 100})
             elif self.path == "/api/validate":
                 if not self.local_browser_operator():

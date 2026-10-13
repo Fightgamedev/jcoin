@@ -2,8 +2,11 @@
 import base64
 import json
 import os
+import shutil
 import stat
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -105,6 +108,64 @@ class NodeLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "nonce"):
             node.validate_tx(second, balances, nonces, [first])
         self.assertEqual(node.get_account(sender)["available"], 10)
+
+    def test_faucet_claim_is_canonical_and_one_time(self):
+        recipient_key = make_key()
+        recipient = self.fund(recipient_key, amount=1)
+        # The local faucet needs 100 confirmed coins before funding a wallet.
+        node.make_block()
+        node.make_block()
+        mixed_case = "jc" + recipient[2:].upper()
+
+        txid = node.request_test_faucet(mixed_case)
+
+        self.assertEqual(len(txid), 64)
+        self.assertTrue(node.get_account(recipient)["test_faucet_claimed"])
+        self.assertEqual(node.get_account(recipient)["pending_in"], 100)
+        with self.assertRaises(node.FaucetAlreadyClaimed):
+            node.request_test_faucet(recipient)
+        node.make_block()
+        self.assertEqual(node.get_account(recipient)["balance"], 101)
+
+    def test_rejected_pending_transaction_is_recorded_with_reason(self):
+        sender_key = make_key()
+        sender = self.fund(sender_key)
+        recipient = "JC" + "a" * 40
+        first = make_tx(sender_key, 5, 0, recipient)
+        second = make_tx(sender_key, 6, 1, recipient)
+        with node.LOCK, node.DB:
+            for tx in (first, second):
+                txid = node.sha256(node.canonical(tx).encode("ascii"))
+                node.DB.execute("INSERT INTO pending VALUES(?,?)", (txid, node.canonical(tx)))
+
+        result = node.make_block()
+
+        self.assertEqual((result["confirmed"], result["rejected"]), (1, 1))
+        history = node.transactions_for(sender)
+        self.assertEqual({item["status"] for item in history}, {"confirmed", "rejected"})
+        rejected = next(item for item in history if item["status"] == "rejected")
+        self.assertIn("Not enough confirmed", rejected["reason"])
+        self.assertEqual(node.DB.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 0)
+
+    def test_chain_passes_validation_after_process_reopen(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix="jcoin-restart-test-") as temp:
+            data_dir = Path(temp) / "node-data"
+            restored_dir = Path(temp) / "restored-node-data"
+            env = os.environ.copy()
+            env["JCOIN_DATA_DIR"] = str(data_dir)
+            create = (
+                "import jcoin_node as node; node.initialize_chain(); "
+                "node.make_block(); node.verify_chain(); node.DB.close()"
+            )
+            reopen = "import jcoin_node as node; node.verify_chain(); node.DB.close()"
+            subprocess.run([sys.executable, "-c", create], cwd=root, env=env,
+                           check=True, capture_output=True, text=True)
+            shutil.copytree(data_dir, restored_dir, copy_function=shutil.copy2)
+            for path in (data_dir, restored_dir):
+                env["JCOIN_DATA_DIR"] = str(path)
+                subprocess.run([sys.executable, "-c", reopen], cwd=root, env=env,
+                               check=True, capture_output=True, text=True)
 
     def test_chain_check_rejects_signed_block_with_wrong_reward(self):
         node.make_block()

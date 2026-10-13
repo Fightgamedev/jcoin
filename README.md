@@ -34,6 +34,7 @@ Create a browser wallet in the dashboard to receive or send coins. Its personal 
 - [First release scope](docs/FIRST-RELEASE.md): initial audience, local test release tasks, acceptance goal, and explicit exclusions.
 - [Improvement backlog](docs/IMPROVEMENT-BACKLOG.md): prioritized gaps found in the current prototype and the planned work to address them.
 - [Network participation rewards](docs/NETWORK-INCENTIVES.md): a proposed path for rewarding people who run JCoin nodes; no public network or node rewards exist today.
+- [Node backup and recovery](docs/NODE-RECOVERY.md): stop the local node, back up the database and validator key together, and restore without deleting the previous data.
 - `AGENTS.md` and `.github/agents/`: shared coding-agent rules and specialist roles. Start with the [beginner's guide to agents](docs/AGENTS-GUIDE.md).
 - `node-data/`: local chain and validator key, generated at first start and excluded from Git.
 
@@ -47,11 +48,13 @@ Run the automated unit and interoperability checks with:
 python3 -m unittest discover -s tests -v
 ```
 
-The suite covers encrypted backup interoperability, isolated ledger validation,
-SQLite integrity failure handling and rollback behavior, POSIX validator-key
-permissions, the whole-coin issuance schedule, and CodeQ allocation
-determinism. Browser WebCrypto checks use Node.js; Python skips those two checks
-when Node.js is unavailable.
+The suite covers encrypted backup interoperability, isolated ledger and
+faucet behavior, rejected-transfer history, restart validation, SQLite
+integrity failure and rollback behavior, disposable-directory backup/restore,
+POSIX validator-key permissions,
+the whole-coin issuance schedule, and CodeQ allocation determinism. Browser
+WebCrypto checks use Node.js; Python skips those two checks when Node.js is
+unavailable.
 This is prototype regression coverage, not an independent security review or
 evidence of payment privacy or distributed consensus.
 
@@ -89,7 +92,8 @@ These are the next concrete tasks, ordered by safety and dependency. Backup inte
 - [x] **Show transfer lifecycle:** Let users see their own pending, confirmed, and rejected test transfers, with clear reasons and no false “paid” state.
 - [x] **Validate the ledger rules:** Startup checks now verify transaction signatures, nonce order, available balances, rewards, and supply rules as well as block links and validator signatures.
 - [ ] **Protect and document node recovery:** Review the unencrypted validator key at rest and define a safe backup/restore procedure for node data.
-- [ ] **Cover core behavior:** Ledger regression coverage now exercises signed transfers, nonce replay, invalid unsigned fields, issuance-rule corruption, and failed-write rollback in an isolated data directory. Add faucet/rejection/restart tests and manually verify the Japanese/English dashboard.
+- [x] **Cover core behavior:** Isolated regression coverage now exercises signed transfers, nonce replay, invalid unsigned fields, issuance-rule corruption, failed-write rollback, faucet claims, rejection history, and process restart.
+- [ ] **Verify the wallet interface manually:** Check Japanese/English first-run, backup restore, privacy choice, and narrow-screen layout.
 - [ ] **Make the implementation easier to maintain:** Split the dashboard's embedded UI and logic into reviewable modules and remove compressed one-line code where practical.
 - [ ] **Research privacy and network architecture:** Compare maintained protocol options, define validator and metadata assumptions, and design peer-to-peer validation before implementing either. No custom cryptography or public deployment yet.
 - [ ] **Review rewards and launch readiness:** Keep third-party node rewards, remote service, merchant payments, and real funds blocked on consensus, abuse resistance, security/privacy, and legal review.

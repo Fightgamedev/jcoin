@@ -18,18 +18,17 @@ Nothing here changes the current test-only status or promises a launch date.
 - [ ] Manually verify Japanese and English dashboard behavior after the recent
   language-switch change, including first-run, backup restore, privacy choice,
   and narrow-screen layout.
-- [ ] Add automated coverage for faucet claims, rejected transfers, and restart
-  recovery. Ledger validation, confirmation, nonce replay, and failed-write
-  rollback now have isolated automated coverage.
+- [x] Add isolated automated coverage for faucet claims, rejected transfers,
+  chain confirmation, nonce replay, failed-write rollback, and restart recovery.
 
 ## Correctness and local key recovery
 
 - [x] At startup, check transaction signatures and ledger semantics in every
   stored block: nonce order, available balances, reward schedule, and supply
   cap, in addition to block links, hashes, and validator signatures.
-- [ ] Document a safe backup and restore procedure for the node database and
-  validator key. The validator key is stored as raw bytes protected by local
-  file permissions, not encrypted at rest.
+- [x] Document a safe stop/copy/restore procedure for the database and
+  validator key in [NODE-RECOVERY.md](NODE-RECOVERY.md); preserve current data
+  before restoring and keep the key paired with its ledger.
 - [x] Synchronize shared SQLite reads and writes across local HTTP worker
   threads, and commit each block plus its pending/rejected/faucet updates as
   one transaction. This remains a single-process local prototype; it is not a
@@ -89,3 +88,5 @@ Nothing here changes the current test-only status or promises a launch date.
 - [x] Define a small local test release and record explicit exclusions.
 - [x] Add isolated ledger regression coverage without opening or modifying the
   operator's `node-data` directory.
+- [x] Copy a disposable node directory and reopen it in a separate process to
+  verify that the backup includes its matching ledger and validator identity.
